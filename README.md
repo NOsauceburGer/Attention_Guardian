@@ -101,7 +101,6 @@ Windows 用户环境完成安装并启动。安装包目前没有项目方 Authe
 - 行为规范：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - 安全问题：[SECURITY.md](SECURITY.md)
 - 使用支持：[SUPPORT.md](SUPPORT.md)
-- GitHub 首次发布指南：[docs/GITHUB_RELEASE_GUIDE.md](docs/GITHUB_RELEASE_GUIDE.md)
 
 ## 许可证
 
