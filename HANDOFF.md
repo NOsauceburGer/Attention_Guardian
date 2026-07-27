@@ -495,3 +495,11 @@ dotnet build AttentionGuardian.slnx --configuration Release --no-restore
 - Release 已公开，不得移动或覆盖 `v0.1.0` Tag 和同名附件；后续修改使用新版本号。
 - 发布后状态文档作为后续提交同步到 `main`；已公开 Tag 保持不可变。
 - `teaching.md` 当前不在 Guardian 工作树，也未包含在首次提交中；未擅自重建。
+
+## 2026-07-28：teaching.md 明确为本地私有教学记录
+
+- 用户确认主动移除 `teaching.md` 是有意行为，不是文件丢失。
+- `teaching.md` 只用于 Agent 指导用户学习，不属于项目源码、产品文档或 GitHub
+  发布内容。
+- `.gitignore` 已明确忽略该文件；后续 Agent 不得暂存、提交或上传它。
+- 文件存在时仍遵守只追加规则；文件不存在时不得仅为提交或发布擅自重建。
