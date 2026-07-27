@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Planned
+
+- 发布后的可靠性、自动化打包与兼容性增强。
+
+## [0.1.0] - 2026-07-28
+
 ### Added
 
 - 建立 Windows 桌面应用、四层架构、双 SQLite 数据库与自动化测试。
@@ -24,7 +30,7 @@
 ### Known limitations
 
 - 安装包尚无项目方 Authenticode 代码签名。
-- 尚未创建版本 Tag 或 GitHub Release，也尚未完成干净 Windows 环境安装矩阵。
+- 尚未完成干净 Windows 环境安装矩阵。
 
 ### Fixed
 

@@ -813,3 +813,18 @@ v0.1.0 GitHub 首版发布前准备。用户已确认现有产品、UI 与基础
 - 大小 185,138,855 字节（176.56 MiB），SHA-256：
   `AB8E7D6BBD5CCD894C48B576C970276794D894CC1AF056EBD6C2C575DE0140F7`。
 - 尚未创建首次 Git 提交、GitHub remote、Tag 或 Release。
+
+## 2026-07-28：首次 GitHub Release 正式公开
+
+- 使用 GitHub 隐私邮箱完成首次提交，提交为
+  `58e582e63be980f65d3d8da08b45ab9e63051d00`。
+- 连接公开仓库 `NOsauceburGer/Attention_Guardian`，推送 `main`，远程提交与本地一致。
+- 创建并推送注释 Tag `v0.1.0`，Tag 指向首次发布提交。
+- 先创建 Draft Release 并上传公开洁净安装器；GitHub 返回附件大小 185,138,855
+  字节、digest
+  `sha256:ab8e7d6bbd5ccd894c48b576c970276794d894cc1af056ebd6c2c575de0140f7`，
+  与本地校验一致后才正式公开。
+- Release 地址：
+  `https://github.com/NOsauceburGer/Attention_Guardian/releases/tag/v0.1.0`
+- 发布后发现 README、Roadmap 等仍有发布前状态措辞；不移动已公开 Tag，而是用后续
+  文档提交同步 `main`，保持已发布版本不可变。

@@ -1,7 +1,7 @@
 # Attention Guardian 首次 GitHub 发布指南
 
-本指南适用于当前状态：本地 `main` 分支尚无首次提交、尚未配置 GitHub 远程仓库，
-v0.1.0 安装包已经生成但尚未公开。
+本指南记录规范的首次发布流程。Attention Guardian v0.1.0 已按该流程完成首次提交、
+推送、Tag、安装包摘要核验和 GitHub Release；后续版本继续复用第 7、8 节。
 
 ## 1. 发布前确认身份与仓库可见性
 

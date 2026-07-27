@@ -2,8 +2,10 @@
 
 Attention Guardian（中文工作名：托管时间）是一款未来事项托管工具。它替用户监控下一件不可错过的事情，让用户在交接时刻到来前安心专注于当前唯一任务。
 
-> 当前状态：v0.1.0 产品与功能发布基线已经用户验收通过。Windows x64 安装包已经
-> 生成并通过本机安装、启动和卸载注册检查；尚未创建 Tag、GitHub Release 或对外发布。
+> 当前状态：Attention Guardian v0.1.0 已在 GitHub 正式发布。Windows x64 安装包
+> 已通过本机安装、空数据启动、卸载注册、隐私扫描和 SHA-256 一致性检查。
+
+下载：[Attention Guardian v0.1.0](https://github.com/NOsauceburGer/Attention_Guardian/releases/tag/v0.1.0)
 
 ## 核心理念
 
@@ -38,7 +40,7 @@ safeUntil = handoffTime
 第一版不包含账号、云同步、第三方日历、AI 接入、社交功能或复杂统计。
 
 已结束当日待办现在会标记完成并退出活动界面，数据库历史仍被保留。未来待办成功
-规划后标记为 `planned`。v0.1.0 安装包已经生成，Tag 和 GitHub Release 尚未创建。
+规划后标记为 `planned`。v0.1.0 安装包、Tag 和 GitHub Release 已正式发布。
 
 ## 使用应用
 

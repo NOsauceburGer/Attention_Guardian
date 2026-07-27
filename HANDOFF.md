@@ -483,3 +483,15 @@ dotnet build AttentionGuardian.slnx --configuration Release --no-restore
   `src/AttentionGuardian.Desktop/Assets/Attention_Guardian_icon_high.ico`。
 - 发布机器的两张业务表已清空；安装后复查均为 0 条。仓库和最终 publish 目录扫描
   不含数据库、日志、Windows 用户名或本机源码绝对路径。
+
+## 2026-07-28：GitHub v0.1.0 已正式发布
+
+- 仓库：`https://github.com/NOsauceburGer/Attention_Guardian`
+- 首次发布提交：`58e582e63be980f65d3d8da08b45ab9e63051d00`
+- `main` 已推送，`v0.1.0` 注释 Tag 指向该提交。
+- Release：`https://github.com/NOsauceburGer/Attention_Guardian/releases/tag/v0.1.0`
+- GitHub 附件大小为 185,138,855 字节，服务端 digest 与本地 SHA-256
+  `AB8E7D6BBD5CCD894C48B576C970276794D894CC1AF056EBD6C2C575DE0140F7` 一致。
+- Release 已公开，不得移动或覆盖 `v0.1.0` Tag 和同名附件；后续修改使用新版本号。
+- 发布后状态文档作为后续提交同步到 `main`；已公开 Tag 保持不可变。
+- `teaching.md` 当前不在 Guardian 工作树，也未包含在首次提交中；未擅自重建。
