@@ -116,6 +116,7 @@ public struct ManagementSurface: View {
     @State private var dragMachine = SpatialDragMachine()
     @State private var draggedTodoId: UUID?
     @State private var dragOriginFrame: CGRect?
+    @State private var dragPressLocation: CGPoint?
     @State private var rowFrames: [UUID: CGRect] = [:]
     @State private var dragPreviews: [ManagementDropPreview] = []
     @State private var dropTarget: ManagementResolvedDropTarget?
@@ -399,8 +400,12 @@ public struct ManagementSurface: View {
         .accessibilityElement(children: .contain)
 
         if item.isSpatiallyDraggable {
-            bubble
-                .simultaneousGesture(spatialDragGesture(
+            let interactiveBubble = bubble.contentShape(RoundedRectangle(
+                cornerRadius: AGLayout.componentCornerRadius,
+                style: .continuous))
+#if os(macOS)
+            interactiveBubble
+                .highPriorityGesture(macOSSpatialDragGesture(
                     item,
                     index: index))
                 .accessibilityHint(
@@ -415,6 +420,24 @@ public struct ManagementSurface: View {
                         item,
                         requestedIndex: index + 1)
                 }
+#else
+            interactiveBubble
+                .simultaneousGesture(touchSpatialDragGesture(
+                    item,
+                    index: index))
+                .accessibilityHint(
+                    "可拖拽排序，也可使用上移或下移操作")
+                .accessibilityAction(named: "上移") {
+                    requestAccessibleReorder(
+                        item,
+                        requestedIndex: index - 1)
+                }
+                .accessibilityAction(named: "下移") {
+                    requestAccessibleReorder(
+                        item,
+                        requestedIndex: index + 1)
+                }
+#endif
         } else {
             bubble.accessibilityHint("不可移动事件不能拖拽")
         }
@@ -618,6 +641,9 @@ public struct ManagementSurface: View {
     private var spatialDragOverlay: some View {
         if let origin = dragOriginFrame,
            draggedTodoId != nil {
+            let anchor = dragPressLocation ?? CGPoint(
+                x: origin.midX,
+                y: origin.midY)
             let diameter = min(
                 AGMotion.spatialBubbleDiameter,
                 min(origin.width, origin.height))
@@ -627,9 +653,11 @@ public struct ManagementSurface: View {
                 + (diameter - origin.height) * dragMorphProgress
             let x = origin.minX
                 + (origin.width - width) / 2
+                + (anchor.x - origin.midX) * dragMorphProgress
                 + renderedDragTranslation.width
             let y = origin.minY
                 + (origin.height - height) / 2
+                + (anchor.y - origin.midY) * dragMorphProgress
                 + renderedDragTranslation.height
 
             LensCoreBubble(
@@ -650,7 +678,33 @@ public struct ManagementSurface: View {
         }
     }
 
-    private func spatialDragGesture(
+#if os(macOS)
+    private func macOSSpatialDragGesture(
+        _ item: ManagementScheduledItem,
+        index: Int
+    ) -> some Gesture {
+        DragGesture(
+            minimumDistance: AGMotion.spatialPointerDragDistance,
+            coordinateSpace: .named(scheduleCoordinateSpace))
+            .onChanged { drag in
+                if draggedTodoId == nil {
+                    beginSpatialPress(
+                        item,
+                        index: index,
+                        pressLocation: drag.startLocation)
+                }
+                updateSpatialDrag(
+                    item,
+                    index: index,
+                    translation: drag.translation,
+                    pressLocation: drag.startLocation)
+            }
+            .onEnded { _ in
+                finishSpatialDrag(item)
+            }
+    }
+#else
+    private func touchSpatialDragGesture(
         _ item: ManagementScheduledItem,
         index: Int
     ) -> some Gesture {
@@ -668,7 +722,8 @@ public struct ManagementSurface: View {
                     updateSpatialDrag(
                         item,
                         index: index,
-                        translation: drag.translation)
+                        translation: drag.translation,
+                        pressLocation: drag.startLocation)
                 default:
                     break
                 }
@@ -682,10 +737,12 @@ public struct ManagementSurface: View {
                 }
             }
     }
+#endif
 
     private func beginSpatialPress(
         _ item: ManagementScheduledItem,
-        index: Int
+        index: Int,
+        pressLocation: CGPoint? = nil
     ) {
         guard editDraft == nil,
               draggedTodoId == nil,
@@ -696,6 +753,9 @@ public struct ManagementSurface: View {
         dragMachine.press(todoId: item.id)
         draggedTodoId = item.id
         dragOriginFrame = frame
+        dragPressLocation = pressLocation ?? CGPoint(
+            x: frame.midX,
+            y: frame.midY)
         renderedDragTranslation = .zero
         dragMorphProgress = 0
         dropTarget = nil
@@ -717,11 +777,15 @@ public struct ManagementSurface: View {
     private func updateSpatialDrag(
         _ item: ManagementScheduledItem,
         index: Int,
-        translation: CGSize
+        translation: CGSize,
+        pressLocation: CGPoint? = nil
     ) {
         guard draggedTodoId == item.id,
               let origin = dragOriginFrame else {
             return
+        }
+        if let pressLocation {
+            dragPressLocation = pressLocation
         }
         if case .pressing = dragMachine.phase {
             dragMachine.lift(originIndex: index)
@@ -824,6 +888,7 @@ public struct ManagementSurface: View {
         dragMachine = SpatialDragMachine()
         draggedTodoId = nil
         dragOriginFrame = nil
+        dragPressLocation = nil
         dragPreviews = []
         dropTarget = nil
         renderedDragTranslation = .zero

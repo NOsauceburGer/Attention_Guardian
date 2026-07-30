@@ -187,4 +187,57 @@ struct AdaptiveLayoutTests {
         #expect(chromeSource.contains(
             "window.isMovableByWindowBackground = false"))
     }
+
+    @Test("Mac pointer drag does not require a stationary long press")
+    func macPointerDragStartsFromMovement() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let managementSource = try String(
+            contentsOf: packageRoot.appendingPathComponent(
+                "Sources/AttentionGuardianPresentation/ManagementSurface.swift"),
+            encoding: .utf8)
+
+        #expect(managementSource.contains(
+            "private func macOSSpatialDragGesture"))
+        #expect(managementSource.contains(
+            "minimumDistance: AGMotion.spatialPointerDragDistance"))
+        #expect(managementSource.contains(
+            ".highPriorityGesture(macOSSpatialDragGesture("))
+    }
+
+    @Test("the full scheduled capsule is a pointer hit target")
+    func scheduledCapsuleHasContinuousHitShape() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let managementSource = try String(
+            contentsOf: packageRoot.appendingPathComponent(
+                "Sources/AttentionGuardianPresentation/ManagementSurface.swift"),
+            encoding: .utf8)
+
+        #expect(managementSource.contains(
+            "bubble.contentShape(RoundedRectangle("))
+    }
+
+    @Test("spatial morph contracts toward the pointer press")
+    func spatialMorphUsesPointerAnchor() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let managementSource = try String(
+            contentsOf: packageRoot.appendingPathComponent(
+                "Sources/AttentionGuardianPresentation/ManagementSurface.swift"),
+            encoding: .utf8)
+
+        #expect(managementSource.contains(
+            "@State private var dragPressLocation: CGPoint?"))
+        #expect(managementSource.contains(
+            "anchor.x - origin.midX"))
+        #expect(managementSource.contains(
+            "anchor.y - origin.midY"))
+    }
 }

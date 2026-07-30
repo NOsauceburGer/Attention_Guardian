@@ -86,4 +86,5 @@ public enum AGMotion {
     public static let spatialTargetScale: CGFloat = 1.032
     public static let spatialBubbleDiameter: CGFloat = 78
     public static let spatialTargetHysteresis: CGFloat = 10
+    public static let spatialPointerDragDistance: CGFloat = 6
 }
