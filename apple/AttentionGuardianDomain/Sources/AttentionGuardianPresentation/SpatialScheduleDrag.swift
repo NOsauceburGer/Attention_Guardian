@@ -45,6 +45,26 @@ public struct ManagementResolvedDropTarget: Equatable, Sendable {
     }
 }
 
+@MainActor
+public enum SpatialDropReleasePlanner {
+    public static func resolve(
+        finalPointer: CGPoint,
+        previousTarget: ManagementResolvedDropTarget?,
+        rowFrames: [Int: CGRect],
+        cachedPreviews: [ManagementDropPreview],
+        loadPreviews: () async throws -> [ManagementDropPreview]
+    ) async throws -> ManagementResolvedDropTarget? {
+        let previews = cachedPreviews.isEmpty
+            ? try await loadPreviews()
+            : cachedPreviews
+        return SpatialDropResolver.releaseTarget(
+            finalPointer: finalPointer,
+            previousTarget: previousTarget,
+            rowFrames: rowFrames,
+            previews: previews)
+    }
+}
+
 public enum SpatialDragPhase: Equatable, Sendable {
     case idle
     case pressing(todoId: UUID)
@@ -54,6 +74,28 @@ public enum SpatialDragPhase: Equatable, Sendable {
     case settling(todoId: UUID, originIndex: Int, targetIndex: Int)
     case committing(todoId: UUID, originIndex: Int, targetIndex: Int)
     case returning(todoId: UUID, originIndex: Int)
+}
+
+public struct SpatialDragSessionTracker: Equatable, Sendable {
+    public private(set) var current: UUID?
+
+    public init() {}
+
+    @discardableResult
+    public mutating func begin() -> UUID {
+        let session = UUID()
+        current = session
+        return session
+    }
+
+    public func isCurrent(_ session: UUID) -> Bool {
+        current == session
+    }
+
+    public mutating func finish(_ session: UUID) {
+        guard isCurrent(session) else { return }
+        current = nil
+    }
 }
 
 public struct SpatialDragMachine: Equatable, Sendable {
@@ -153,6 +195,20 @@ public struct SpatialDragMachine: Equatable, Sendable {
 }
 
 public enum SpatialDropResolver {
+    public static func releaseTarget(
+        finalPointer: CGPoint,
+        previousTarget: ManagementResolvedDropTarget?,
+        rowFrames: [Int: CGRect],
+        previews: [ManagementDropPreview]
+    ) -> ManagementResolvedDropTarget? {
+        target(
+            pointer: finalPointer,
+            currentTarget: previousTarget,
+            rowFrames: rowFrames,
+            previews: previews,
+            hysteresis: 0)
+    }
+
     public static func target(
         pointer: CGPoint,
         currentTarget: ManagementResolvedDropTarget?,

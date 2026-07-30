@@ -43,7 +43,16 @@ public struct ManagementScheduledItem: Identifiable, Equatable, Sendable {
 public struct ManagementScheduleRow: Identifiable, Equatable, Sendable {
     public let items: [ManagementScheduledItem]
 
-    public var id: UUID { items[0].id }
+    public var id: UUID {
+        Self.stableID(for: items.map(\.id))
+    }
+
+    public static func stableID(for ids: [UUID]) -> UUID {
+        ids.min {
+            $0.uuidString.lowercased()
+                < $1.uuidString.lowercased()
+        }!
+    }
 }
 
 public enum ManagementScheduleLayout {
@@ -165,6 +174,7 @@ public struct ManagementSurface: View {
     @State private var isSavingEdit = false
     @State private var errorMessage: String?
     @State private var dragMachine = SpatialDragMachine()
+    @State private var dragSessions = SpatialDragSessionTracker()
     @State private var draggedTodoId: UUID?
     @State private var dragOriginFrame: CGRect?
     @State private var dragPressLocation: CGPoint?
@@ -226,9 +236,11 @@ public struct ManagementSurface: View {
                 }
                 .onChange(of: mandatoryGroups) { _, groups in
                     guard let firstGroup = groups.first,
-                          let firstId = firstGroup.first else {
+                          !firstGroup.isEmpty else {
                         return
                     }
+                    let firstId = ManagementScheduleRow.stableID(
+                        for: firstGroup)
                     withAnimation(reduceMotion ? nil : AGMotion.spatialFollow) {
                         proxy.scrollTo(firstId, anchor: .center)
                     }
@@ -784,8 +796,11 @@ public struct ManagementSurface: View {
                     translation: drag.translation,
                     pressLocation: drag.startLocation)
             }
-            .onEnded { _ in
-                finishSpatialDrag(item)
+            .onEnded { drag in
+                finishSpatialDrag(
+                    item,
+                    finalTranslation: drag.translation,
+                    pressLocation: drag.startLocation)
             }
     }
 #else
@@ -815,8 +830,11 @@ public struct ManagementSurface: View {
             }
             .onEnded { value in
                 switch value {
-                case .second(true, _):
-                    finishSpatialDrag(item)
+                case let .second(true, drag?):
+                    finishSpatialDrag(
+                        item,
+                        finalTranslation: drag.translation,
+                        pressLocation: drag.startLocation)
                 default:
                     returnSpatialDrag()
                 }
@@ -836,6 +854,7 @@ public struct ManagementSurface: View {
             return
         }
         dragMachine.press(todoId: item.id)
+        let session = dragSessions.begin()
         draggedTodoId = item.id
         dragOriginFrame = frame
         dragPressLocation = pressLocation ?? CGPoint(
@@ -849,10 +868,16 @@ public struct ManagementSurface: View {
         Task {
             do {
                 let previews = try await onPreviewReorder(item.id)
-                guard draggedTodoId == item.id else { return }
+                guard dragSessions.isCurrent(session),
+                      draggedTodoId == item.id else {
+                    return
+                }
                 dragPreviews = previews
             } catch {
-                guard draggedTodoId == item.id else { return }
+                guard dragSessions.isCurrent(session),
+                      draggedTodoId == item.id else {
+                    return
+                }
                 returnSpatialDrag(
                     message: "暂时无法确认可放置位置，本地事项没有改变。")
             }
@@ -907,9 +932,58 @@ public struct ManagementSurface: View {
         }
     }
 
-    private func finishSpatialDrag(_ item: ManagementScheduledItem) {
+    private func finishSpatialDrag(
+        _ item: ManagementScheduledItem,
+        finalTranslation: CGSize,
+        pressLocation: CGPoint
+    ) {
         guard draggedTodoId == item.id,
-              let target = dropTarget,
+              let session = dragSessions.current else {
+            return
+        }
+        let indexedFrames = Dictionary(uniqueKeysWithValues:
+            scheduledItems.enumerated().compactMap { rowIndex, row in
+                rowFrames[row.id].map { (rowIndex, $0) }
+            })
+        let finalPointer = CGPoint(
+            x: pressLocation.x + finalTranslation.width,
+            y: pressLocation.y + finalTranslation.height)
+
+        Task {
+            do {
+                let target = try await SpatialDropReleasePlanner.resolve(
+                    finalPointer: finalPointer,
+                    previousTarget: dropTarget,
+                    rowFrames: indexedFrames,
+                    cachedPreviews: dragPreviews
+                ) {
+                    try await onPreviewReorder(item.id)
+                }
+                guard dragSessions.isCurrent(session),
+                      draggedTodoId == item.id,
+                      let target else {
+                    returnSpatialDrag()
+                    return
+                }
+                dropTarget = target
+                settleSpatialDrag(
+                    item,
+                    target: target,
+                    session: session)
+            } catch {
+                guard dragSessions.isCurrent(session) else { return }
+                returnSpatialDrag(
+                    message: "暂时无法确认可放置位置，本地事项没有改变。")
+            }
+        }
+    }
+
+    private func settleSpatialDrag(
+        _ item: ManagementScheduledItem,
+        target: ManagementResolvedDropTarget,
+        session: UUID
+    ) {
+        guard dragSessions.isCurrent(session),
               let targetItem = scheduledItems[
                 safe: target.actualIndex],
               let destination = rowFrames[targetItem.id],
@@ -943,9 +1017,11 @@ public struct ManagementSurface: View {
                 if !reduceMotion {
                     try? await Task.sleep(for: .milliseconds(220))
                 }
+                guard dragSessions.isCurrent(session) else { return }
                 dragMachine.finish()
                 resetSpatialDrag()
             } catch {
+                guard dragSessions.isCurrent(session) else { return }
                 returnSpatialDrag(
                     message: "排序没有保存，事件已回到原来的位置。")
             }
@@ -973,6 +1049,9 @@ public struct ManagementSurface: View {
     }
 
     private func resetSpatialDrag() {
+        if let session = dragSessions.current {
+            dragSessions.finish(session)
+        }
         dragMachine = SpatialDragMachine()
         draggedTodoId = nil
         dragOriginFrame = nil

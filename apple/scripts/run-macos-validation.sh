@@ -9,6 +9,30 @@ app_path="$output_root/Attention Guardian Validation.app"
 contents_path="$app_path/Contents"
 executable_name="AttentionGuardianMacApp"
 bundle_identifier="local.attentionguardian.validation"
+validation_executable_path="$contents_path/MacOS/$executable_name"
+
+wait_for_validation_exit() {
+    local running_pid="$1"
+    local attempt
+    for attempt in {1..30}; do
+        if ! kill -0 "$running_pid" 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.1
+    done
+    print -u2 -r -- \
+        "Validation app process $running_pid did not exit in time."
+    return 1
+}
+
+if [[ "${1:-}" != "--build-only" ]]; then
+    running_pids=(${(f)"$(pgrep -f -x \
+        "$validation_executable_path" || true)"})
+    for running_pid in "${running_pids[@]}"; do
+        kill "$running_pid"
+        wait_for_validation_exit "$running_pid"
+    done
+fi
 
 mkdir -p "$output_root"
 rm -rf "$app_path"

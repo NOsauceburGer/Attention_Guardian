@@ -171,6 +171,81 @@ struct AdaptiveLayoutTests {
         #expect(target?.actualIndex == 1)
     }
 
+    @Test("release resolves the final pointer instead of a stale drag target")
+    func releaseUsesFinalPointer() {
+        let frames = [
+            0: CGRect(x: 0, y: 0, width: 140, height: 50),
+            1: CGRect(x: 152, y: 0, width: 140, height: 50)
+        ]
+        let previews = [
+            ManagementDropPreview(
+                requestedIndex: 0,
+                actualIndex: 0,
+                usedFallbackPosition: false),
+            ManagementDropPreview(
+                requestedIndex: 1,
+                actualIndex: 1,
+                usedFallbackPosition: false)
+        ]
+        let stale = ManagementResolvedDropTarget(
+            requestedIndex: 0,
+            actualIndex: 0,
+            usedFallbackPosition: false)
+
+        let target = SpatialDropResolver.releaseTarget(
+            finalPointer: CGPoint(x: 230, y: 25),
+            previousTarget: stale,
+            rowFrames: frames,
+            previews: previews)
+
+        #expect(target?.requestedIndex == 1)
+        #expect(target?.actualIndex == 1)
+    }
+
+    @Test("release waits for legal previews when a repeated drag is faster than loading")
+    func releaseWaitsForPreviews() async throws {
+        let frames = [
+            0: CGRect(x: 0, y: 0, width: 140, height: 50),
+            1: CGRect(x: 152, y: 0, width: 140, height: 50)
+        ]
+        let loaded = [
+            ManagementDropPreview(
+                requestedIndex: 0,
+                actualIndex: 0,
+                usedFallbackPosition: false),
+            ManagementDropPreview(
+                requestedIndex: 1,
+                actualIndex: 1,
+                usedFallbackPosition: false)
+        ]
+
+        let target = try await SpatialDropReleasePlanner.resolve(
+            finalPointer: CGPoint(x: 230, y: 25),
+            previousTarget: nil,
+            rowFrames: frames,
+            cachedPreviews: []
+        ) {
+            loaded
+        }
+
+        #expect(target?.requestedIndex == 1)
+    }
+
+    @Test("a stale preview cannot enter a repeated drag of the same event")
+    func repeatedDragRejectsStaleSession() {
+        var sessions = SpatialDragSessionTracker()
+
+        let first = sessions.begin()
+        let second = sessions.begin()
+
+        #expect(first != second)
+        #expect(!sessions.isCurrent(first))
+        #expect(sessions.isCurrent(second))
+
+        sessions.finish(second)
+        #expect(!sessions.isCurrent(second))
+    }
+
     @Test("only ordinary scheduled items can start spatial drag")
     func ordinaryOnlySpatialDrag() throws {
         let start = Date(timeIntervalSince1970: 1_775_410_000)
@@ -227,6 +302,43 @@ struct AdaptiveLayoutTests {
         #expect(rows[0].items.allSatisfy { $0.isSpatiallyDraggable })
     }
 
+    @Test("mandatory group row identity stays stable when its order changes")
+    func mandatoryGroupIdentityIsOrderIndependent() throws {
+        let start = Date(timeIntervalSince1970: 1_775_430_000)
+        let first = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000909")),
+            title: "固定一",
+            start: start,
+            end: start.addingTimeInterval(1_800),
+            isMandatory: true)
+        let second = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000910")),
+            title: "固定二",
+            start: first.end,
+            end: first.end.addingTimeInterval(1_800),
+            isMandatory: true)
+        let firstOrder = ManagementScheduleRow(items: [
+            ManagementScheduledItem(
+                todo: first,
+                allowsMandatoryGroupDrag: true),
+            ManagementScheduledItem(
+                todo: second,
+                allowsMandatoryGroupDrag: true)
+        ])
+        let reversedOrder = ManagementScheduleRow(items: [
+            ManagementScheduledItem(
+                todo: second,
+                allowsMandatoryGroupDrag: true),
+            ManagementScheduledItem(
+                todo: first,
+                allowsMandatoryGroupDrag: true)
+        ])
+
+        #expect(firstOrder.id == reversedOrder.id)
+    }
+
     @Test("spatial target scale stays calm but perceptible")
     func spatialTargetScale() {
         #expect(AGMotion.spatialTargetScale >= 1.03)
@@ -246,6 +358,24 @@ struct AdaptiveLayoutTests {
 
         #expect(chromeSource.contains(
             "window.isMovableByWindowBackground = false"))
+    }
+
+    @Test("validation launcher replaces the running validation process")
+    func validationLauncherRestartsExistingApp() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let script = try String(
+            contentsOf: packageRoot
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    "scripts/run-macos-validation.sh"),
+            encoding: .utf8)
+
+        #expect(script.contains("pgrep -f -x"))
+        #expect(script.contains("kill \"$running_pid\""))
+        #expect(script.contains("wait_for_validation_exit"))
     }
 
     @Test("Mac pointer drag does not require a stationary long press")
