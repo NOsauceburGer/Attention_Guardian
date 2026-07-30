@@ -71,4 +71,19 @@ public enum AGMotion {
         response: 0.42,
         dampingFraction: 0.9,
         blendDuration: 0.14)
+    public static let spatialLift = Animation.spring(
+        response: 0.32,
+        dampingFraction: 0.88,
+        blendDuration: 0.1)
+    public static let spatialFollow = Animation.interactiveSpring(
+        response: 0.24,
+        dampingFraction: 0.84,
+        blendDuration: 0.08)
+    public static let spatialSettle = Animation.spring(
+        response: 0.4,
+        dampingFraction: 0.86,
+        blendDuration: 0.12)
+    public static let spatialTargetScale: CGFloat = 1.032
+    public static let spatialBubbleDiameter: CGFloat = 78
+    public static let spatialTargetHysteresis: CGFloat = 10
 }

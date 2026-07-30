@@ -25,6 +25,7 @@ public struct ManagementScheduledItem: Identifiable, Equatable, Sendable {
     public var start: Date { todo.start }
     public var isMandatory: Bool { todo.isMandatory }
     public var isBreak: Bool { todo.title == ScheduleManagement.breakTitle }
+    public var isSpatiallyDraggable: Bool { !todo.isMandatory }
 }
 
 public struct ManagementFutureItem: Identifiable, Equatable, Sendable {
@@ -84,6 +85,8 @@ public struct ManagementSurface: View {
     private var horizontalSizeClass
     @Environment(\.dynamicTypeSize)
     private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
 
     private let scheduledItems: [ManagementScheduledItem]
     private let futureItems: [ManagementFutureItem]?
@@ -93,6 +96,10 @@ public struct ManagementSurface: View {
         ManagementScheduledEditDraft,
         StartTimeConflictResolution?
     ) async throws -> ManagementScheduledEditOutcome
+    private let onPreviewReorder:
+        (UUID) async throws -> [ManagementDropPreview]
+    private let onReorder:
+        (UUID, Int) async throws -> ManagementReorderOutcome
     private let onDeleteScheduled: (UUID) async throws -> Void
     private let onDeleteFuture: (UUID) async throws -> Void
     private let onBack: () -> Void
@@ -106,6 +113,15 @@ public struct ManagementSurface: View {
     @State private var shouldLeaveAfterSave = false
     @State private var isSavingEdit = false
     @State private var errorMessage: String?
+    @State private var dragMachine = SpatialDragMachine()
+    @State private var draggedTodoId: UUID?
+    @State private var dragOriginFrame: CGRect?
+    @State private var rowFrames: [UUID: CGRect] = [:]
+    @State private var dragPreviews: [ManagementDropPreview] = []
+    @State private var dropTarget: ManagementResolvedDropTarget?
+    @State private var renderedDragTranslation = CGSize.zero
+    @State private var dragMorphProgress: CGFloat = 0
+    @State private var reorderNotice: String?
 
     public init(
         scheduledItems: [ManagementScheduledItem],
@@ -116,6 +132,13 @@ public struct ManagementSurface: View {
             ManagementScheduledEditDraft,
             StartTimeConflictResolution?
         ) async throws -> ManagementScheduledEditOutcome,
+        onPreviewReorder: @escaping (
+            UUID
+        ) async throws -> [ManagementDropPreview],
+        onReorder: @escaping (
+            UUID,
+            Int
+        ) async throws -> ManagementReorderOutcome,
         onDeleteScheduled: @escaping (UUID) async throws -> Void,
         onDeleteFuture: @escaping (UUID) async throws -> Void,
         onBack: @escaping () -> Void
@@ -125,6 +148,8 @@ public struct ManagementSurface: View {
         self.isLoading = isLoading
         self.onLoadFutureTodos = onLoadFutureTodos
         self.onSaveScheduled = onSaveScheduled
+        self.onPreviewReorder = onPreviewReorder
+        self.onReorder = onReorder
         self.onDeleteScheduled = onDeleteScheduled
         self.onDeleteFuture = onDeleteFuture
         self.onBack = onBack
@@ -144,7 +169,30 @@ public struct ManagementSurface: View {
                 .padding(.horizontal, horizontalInset)
                 .padding(.vertical, AGSpace.section)
             }
+
+            spatialDragOverlay
+
+            if let reorderNotice {
+                VStack {
+                    Text(reorderNotice)
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, AGSpace.component)
+                        .frame(minHeight: AGLayout.minimumTouchTarget)
+                        .background(.thinMaterial, in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(
+                                .white.opacity(0.2),
+                                lineWidth: 0.75)
+                        }
+                        .accessibilityAddTraits(.isStaticText)
+                    Spacer()
+                }
+                .padding(.top, AGSpace.section)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(20)
+            }
         }
+        .coordinateSpace(name: scheduleCoordinateSpace)
         .foregroundStyle(.white)
         .confirmationDialog(
             deletion.map { "删除“\($0.title)”？" } ?? "",
@@ -222,6 +270,9 @@ public struct ManagementSurface: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .onDisappear {
+            resetSpatialDrag()
+        }
     }
 
     private var header: some View {
@@ -285,17 +336,22 @@ public struct ManagementSurface: View {
             }
         } else {
             LazyVStack(spacing: AGSpace.related) {
-                ForEach(scheduledItems) { item in
-                    scheduledBubble(item)
+                ForEach(
+                    Array(scheduledItems.enumerated()),
+                    id: \.element.id
+                ) { index, item in
+                    scheduledBubble(item, index: index)
                 }
             }
         }
     }
 
+    @ViewBuilder
     private func scheduledBubble(
-        _ item: ManagementScheduledItem
+        _ item: ManagementScheduledItem,
+        index: Int
     ) -> some View {
-        GlassSurface {
+        let bubble = GlassSurface {
             VStack(spacing: AGSpace.component) {
                 scheduledSummary(item)
                     .onTapGesture(count: 2) {
@@ -309,6 +365,31 @@ public struct ManagementSurface: View {
             }
             .padding(AGSpace.component)
         }
+        .opacity(draggedTodoId == item.id ? 0.12 : 1)
+        .scaleEffect(
+            dropTarget?.actualIndex == index
+                && draggedTodoId != item.id
+                ? AGMotion.spatialTargetScale : 1)
+        .overlay {
+            if dropTarget?.actualIndex == index,
+               draggedTodoId != item.id {
+                RoundedRectangle(
+                    cornerRadius: AGLayout.componentCornerRadius,
+                    style: .continuous)
+                    .strokeBorder(
+                        .white.opacity(0.16),
+                        lineWidth: 0.75)
+            }
+        }
+        .animation(
+            reduceMotion ? nil : AGMotion.spatialFollow,
+            value: dropTarget?.actualIndex)
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(
+                "attention-guardian-schedule-management"))
+        } action: { frame in
+            rowFrames[item.id] = frame
+        }
         .accessibilityAction(
             named: editDraft?.id == item.id
                 ? "收起并保存编辑" : "展开编辑"
@@ -316,6 +397,27 @@ public struct ManagementSurface: View {
             toggleEdit(item)
         }
         .accessibilityElement(children: .contain)
+
+        if item.isSpatiallyDraggable {
+            bubble
+                .simultaneousGesture(spatialDragGesture(
+                    item,
+                    index: index))
+                .accessibilityHint(
+                    "可拖拽排序，也可使用上移或下移操作")
+                .accessibilityAction(named: "上移") {
+                    requestAccessibleReorder(
+                        item,
+                        requestedIndex: index - 1)
+                }
+                .accessibilityAction(named: "下移") {
+                    requestAccessibleReorder(
+                        item,
+                        requestedIndex: index + 1)
+                }
+        } else {
+            bubble.accessibilityHint("不可移动事件不能拖拽")
+        }
     }
 
     private func scheduledSummary(
@@ -344,6 +446,7 @@ public struct ManagementSurface: View {
                 }
 
                 Button("删除", role: .destructive) {
+                    guard draggedTodoId == nil else { return }
                     deletion = DeletionRequest(
                         id: item.id,
                         title: item.title,
@@ -511,6 +614,260 @@ public struct ManagementSurface: View {
             style: .continuous))
     }
 
+    @ViewBuilder
+    private var spatialDragOverlay: some View {
+        if let origin = dragOriginFrame,
+           draggedTodoId != nil {
+            let diameter = min(
+                AGMotion.spatialBubbleDiameter,
+                min(origin.width, origin.height))
+            let width = origin.width
+                + (diameter - origin.width) * dragMorphProgress
+            let height = origin.height
+                + (diameter - origin.height) * dragMorphProgress
+            let x = origin.minX
+                + (origin.width - width) / 2
+                + renderedDragTranslation.width
+            let y = origin.minY
+                + (origin.height - height) / 2
+                + renderedDragTranslation.height
+
+            LensCoreBubble(
+                width: width,
+                height: height,
+                morphProgress: dragMorphProgress,
+                isMagnetized: dropTarget != nil)
+                .frame(width: width, height: height)
+                .transformEffect(CGAffineTransform(
+                    translationX: x,
+                    y: y))
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading)
+                .allowsHitTesting(false)
+                .zIndex(10)
+        }
+    }
+
+    private func spatialDragGesture(
+        _ item: ManagementScheduledItem,
+        index: Int
+    ) -> some Gesture {
+        LongPressGesture(
+            minimumDuration: 0.12,
+            maximumDistance: 10)
+            .sequenced(before: DragGesture(
+                minimumDistance: 0,
+                coordinateSpace: .named(scheduleCoordinateSpace)))
+            .onChanged { value in
+                switch value {
+                case .first(true):
+                    beginSpatialPress(item, index: index)
+                case let .second(true, drag?):
+                    updateSpatialDrag(
+                        item,
+                        index: index,
+                        translation: drag.translation)
+                default:
+                    break
+                }
+            }
+            .onEnded { value in
+                switch value {
+                case .second(true, _):
+                    finishSpatialDrag(item)
+                default:
+                    returnSpatialDrag()
+                }
+            }
+    }
+
+    private func beginSpatialPress(
+        _ item: ManagementScheduledItem,
+        index: Int
+    ) {
+        guard editDraft == nil,
+              draggedTodoId == nil,
+              item.isSpatiallyDraggable,
+              let frame = rowFrames[item.id] else {
+            return
+        }
+        dragMachine.press(todoId: item.id)
+        draggedTodoId = item.id
+        dragOriginFrame = frame
+        renderedDragTranslation = .zero
+        dragMorphProgress = 0
+        dropTarget = nil
+        dragPreviews = []
+
+        Task {
+            do {
+                let previews = try await onPreviewReorder(item.id)
+                guard draggedTodoId == item.id else { return }
+                dragPreviews = previews
+            } catch {
+                guard draggedTodoId == item.id else { return }
+                returnSpatialDrag(
+                    message: "暂时无法确认可放置位置，本地事项没有改变。")
+            }
+        }
+    }
+
+    private func updateSpatialDrag(
+        _ item: ManagementScheduledItem,
+        index: Int,
+        translation: CGSize
+    ) {
+        guard draggedTodoId == item.id,
+              let origin = dragOriginFrame else {
+            return
+        }
+        if case .pressing = dragMachine.phase {
+            dragMachine.lift(originIndex: index)
+            dragMachine.drag()
+            withAnimation(reduceMotion ? nil : AGMotion.spatialLift) {
+                dragMorphProgress = 1
+            }
+        }
+
+        withAnimation(reduceMotion ? nil : AGMotion.spatialFollow) {
+            renderedDragTranslation = translation
+        }
+
+        let indexedFrames = Dictionary(uniqueKeysWithValues:
+            scheduledItems.enumerated().compactMap { rowIndex, row in
+                rowFrames[row.id].map { (rowIndex, $0) }
+            })
+        let resolved = SpatialDropResolver.target(
+            pointerY: origin.midY + translation.height,
+            currentTarget: dropTarget,
+            rowFrames: indexedFrames,
+            previews: dragPreviews,
+            hysteresis: AGMotion.spatialTargetHysteresis)
+        if resolved != dropTarget {
+            dropTarget = resolved
+            if let resolved {
+                dragMachine.magnetize(targetIndex: resolved.actualIndex)
+            } else {
+                dragMachine.drag()
+            }
+        }
+    }
+
+    private func finishSpatialDrag(_ item: ManagementScheduledItem) {
+        guard draggedTodoId == item.id,
+              let target = dropTarget,
+              let targetItem = scheduledItems[
+                safe: target.actualIndex],
+              let destination = rowFrames[targetItem.id],
+              let origin = dragOriginFrame else {
+            returnSpatialDrag()
+            return
+        }
+
+        dragMachine.release()
+        let landingTranslation = CGSize(
+            width: destination.midX - origin.midX,
+            height: destination.midY - origin.midY)
+        withAnimation(reduceMotion ? nil : AGMotion.spatialSettle) {
+            renderedDragTranslation = landingTranslation
+            dragMorphProgress = 0
+        }
+        dragMachine.beginCommit()
+
+        Task {
+            if !reduceMotion {
+                try? await Task.sleep(for: .milliseconds(180))
+            }
+            do {
+                let outcome = try await onReorder(
+                    item.id,
+                    target.requestedIndex)
+                if outcome.usedFallbackPosition {
+                    showReorderNotice(
+                        "这个事件没办法放在这里，已移到最近可用位置")
+                }
+                if !reduceMotion {
+                    try? await Task.sleep(for: .milliseconds(220))
+                }
+                dragMachine.finish()
+                resetSpatialDrag()
+            } catch {
+                returnSpatialDrag(
+                    message: "排序没有保存，事件已回到原来的位置。")
+            }
+        }
+    }
+
+    private func returnSpatialDrag(message: String? = nil) {
+        guard draggedTodoId != nil else { return }
+        dragMachine.fail()
+        withAnimation(reduceMotion ? nil : AGMotion.spatialSettle) {
+            renderedDragTranslation = .zero
+            dragMorphProgress = 0
+            dropTarget = nil
+        }
+        Task {
+            if !reduceMotion {
+                try? await Task.sleep(for: .milliseconds(260))
+            }
+            dragMachine.finish()
+            resetSpatialDrag()
+            if let message {
+                errorMessage = message
+            }
+        }
+    }
+
+    private func resetSpatialDrag() {
+        dragMachine = SpatialDragMachine()
+        draggedTodoId = nil
+        dragOriginFrame = nil
+        dragPreviews = []
+        dropTarget = nil
+        renderedDragTranslation = .zero
+        dragMorphProgress = 0
+    }
+
+    private func requestAccessibleReorder(
+        _ item: ManagementScheduledItem,
+        requestedIndex: Int
+    ) {
+        guard item.isSpatiallyDraggable,
+              scheduledItems.indices.contains(requestedIndex),
+              editDraft == nil,
+              draggedTodoId == nil else {
+            return
+        }
+        Task {
+            do {
+                let outcome = try await onReorder(
+                    item.id,
+                    requestedIndex)
+                if outcome.usedFallbackPosition {
+                    showReorderNotice(
+                        "这个事件没办法放在这里，已移到最近可用位置")
+                }
+            } catch {
+                errorMessage = "排序没有保存，本地事项没有改变。"
+            }
+        }
+    }
+
+    private func showReorderNotice(_ message: String) {
+        withAnimation(reduceMotion ? nil : AGMotion.spatialFollow) {
+            reorderNotice = message
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard reorderNotice == message else { return }
+            withAnimation(reduceMotion ? nil : AGMotion.spatialFollow) {
+                reorderNotice = nil
+            }
+        }
+    }
+
     private func confirmDeletion(_ request: DeletionRequest) async {
         do {
             switch request.kind {
@@ -525,7 +882,7 @@ public struct ManagementSurface: View {
     }
 
     private func toggleEdit(_ item: ManagementScheduledItem) {
-        guard !isSavingEdit else { return }
+        guard !isSavingEdit, draggedTodoId == nil else { return }
         if editDraft?.id == item.id {
             Task { await saveEdit(resolution: nil) }
         } else if editDraft == nil {
@@ -586,6 +943,16 @@ public struct ManagementSurface: View {
         AGLayout.horizontalInset(
             compact: horizontalSizeClass == .compact,
             accessibilityText: dynamicTypeSize.isAccessibilitySize)
+    }
+
+    private var scheduleCoordinateSpace: String {
+        "attention-guardian-schedule-management"
+    }
+}
+
+private extension Collection {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

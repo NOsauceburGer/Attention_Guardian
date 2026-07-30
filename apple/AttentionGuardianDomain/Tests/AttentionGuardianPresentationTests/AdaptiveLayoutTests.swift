@@ -64,4 +64,112 @@ struct AdaptiveLayoutTests {
         #expect(draft.isMandatory)
         #expect(draft.isValid)
     }
+
+    @Test("spatial drag follows the legal lifecycle")
+    func spatialDragLifecycle() throws {
+        let id = try #require(UUID(uuidString:
+            "00000000-0000-0000-0000-000000000903"))
+        var machine = SpatialDragMachine()
+
+        machine.press(todoId: id)
+        machine.lift(originIndex: 1)
+        machine.drag()
+        machine.magnetize(targetIndex: 2)
+        machine.release()
+        machine.beginCommit()
+        machine.finish()
+
+        #expect(machine.phase == .idle)
+    }
+
+    @Test("failed spatial drag returns to its origin")
+    func spatialDragFailureReturns() throws {
+        let id = try #require(UUID(uuidString:
+            "00000000-0000-0000-0000-000000000904"))
+        var machine = SpatialDragMachine()
+        machine.press(todoId: id)
+        machine.lift(originIndex: 1)
+        machine.drag()
+        machine.fail()
+
+        #expect(machine.phase == .returning(
+            todoId: id,
+            originIndex: 1))
+        machine.finish()
+        #expect(machine.phase == .idle)
+    }
+
+    @Test("failed spatial commit returns to its true origin")
+    func spatialCommitFailureReturns() throws {
+        let id = try #require(UUID(uuidString:
+            "00000000-0000-0000-0000-000000000905"))
+        var machine = SpatialDragMachine()
+        machine.press(todoId: id)
+        machine.lift(originIndex: 3)
+        machine.drag()
+        machine.magnetize(targetIndex: 1)
+        machine.release()
+        machine.beginCommit()
+        machine.fail()
+
+        #expect(machine.phase == .returning(
+            todoId: id,
+            originIndex: 3))
+    }
+
+    @Test("target resolver keeps the current target inside hysteresis")
+    func targetResolverUsesHysteresis() {
+        let frames = [
+            0: CGRect(x: 0, y: 0, width: 300, height: 50),
+            1: CGRect(x: 0, y: 62, width: 300, height: 50)
+        ]
+        let previews = [
+            ManagementDropPreview(
+                requestedIndex: 0,
+                actualIndex: 0,
+                usedFallbackPosition: false),
+            ManagementDropPreview(
+                requestedIndex: 1,
+                actualIndex: 1,
+                usedFallbackPosition: false)
+        ]
+
+        let target = SpatialDropResolver.targetIndex(
+            pointerY: 57,
+            currentTarget: 0,
+            rowFrames: frames,
+            previews: previews,
+            hysteresis: 8)
+
+        #expect(target == 0)
+    }
+
+    @Test("only ordinary scheduled items can start spatial drag")
+    func ordinaryOnlySpatialDrag() throws {
+        let start = Date(timeIntervalSince1970: 1_775_410_000)
+        let ordinary = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000905")),
+            title: "普通",
+            start: start,
+            end: start.addingTimeInterval(1_800))
+        let mandatory = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000906")),
+            title: "不可移动",
+            start: ordinary.end,
+            end: ordinary.end.addingTimeInterval(1_800),
+            isMandatory: true)
+
+        #expect(ManagementScheduledItem(
+            todo: ordinary).isSpatiallyDraggable)
+        #expect(!ManagementScheduledItem(
+            todo: mandatory).isSpatiallyDraggable)
+    }
+
+    @Test("spatial target scale stays calm but perceptible")
+    func spatialTargetScale() {
+        #expect(AGMotion.spatialTargetScale >= 1.03)
+        #expect(AGMotion.spatialTargetScale <= 1.035)
+    }
 }

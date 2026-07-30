@@ -1,6 +1,22 @@
 import Foundation
 import AttentionGuardianDomain
 
+public struct ScheduleReorderPreview: Equatable, Sendable {
+    public let requestedIndex: Int
+    public let actualIndex: Int
+    public let usedFallbackPosition: Bool
+
+    public init(
+        requestedIndex: Int,
+        actualIndex: Int,
+        usedFallbackPosition: Bool
+    ) {
+        self.requestedIndex = requestedIndex
+        self.actualIndex = actualIndex
+        self.usedFallbackPosition = usedFallbackPosition
+    }
+}
+
 public struct ScheduleManagementUseCase: Sendable {
     private let repository: any ScheduledTodoRepository
     private let clock: any Clock
@@ -32,6 +48,22 @@ public struct ScheduleManagementUseCase: Sendable {
             requestedIndex: requestedIndex)
         try await persist(result.scheduledTodos, over: context.records)
         return result
+    }
+
+    public func previewReorder(
+        todoId: UUID
+    ) async throws -> [ScheduleReorderPreview] {
+        let context = try await loadContext()
+        return try context.active.indices.map { requestedIndex in
+            let result = try ScheduleManagement.reorder(
+                context.active,
+                todoId: todoId,
+                requestedIndex: requestedIndex)
+            return ScheduleReorderPreview(
+                requestedIndex: requestedIndex,
+                actualIndex: result.actualIndex,
+                usedFallbackPosition: result.usedFallbackPosition)
+        }
     }
 
     public func edit(

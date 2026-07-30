@@ -75,6 +75,39 @@ struct ScheduleManagementUseCaseTests {
     }
 
     @Test
+    func reorderPreviewUsesDomainForEveryIndexWithoutWriting() async throws {
+        let now = Date(timeIntervalSince1970: 1_775_305_000)
+        let first = try item(
+            "00000000-0000-0000-0000-000000000805",
+            "第一", now, 1_800)
+        let blocker = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000806")),
+            title: "不可移动",
+            start: first.end,
+            end: first.end.addingTimeInterval(1_800),
+            isMandatory: true)
+        let moving = try item(
+            "00000000-0000-0000-0000-000000000807",
+            "移动", blocker.end, 1_800)
+        let repository = ScheduledTodoRepositoryFake(records: [
+            ScheduledTodoRecord(todo: first),
+            ScheduledTodoRecord(todo: blocker),
+            ScheduledTodoRecord(todo: moving)
+        ])
+        let service = ScheduleManagementUseCase(
+            repository: repository,
+            clock: FixedClock(now: now.addingTimeInterval(-60)))
+
+        let previews = try await service.previewReorder(todoId: moving.id)
+
+        #expect(previews.map(\.requestedIndex) == [0, 1, 2])
+        #expect(previews[1].actualIndex == 2)
+        #expect(previews[1].usedFallbackPosition)
+        #expect(repository.replacements.isEmpty)
+    }
+
+    @Test
     func rejectedStartEditDoesNotWrite() async throws {
         let now = Date(timeIntervalSince1970: 1_775_310_000)
         let moving = try item("00000000-0000-0000-0000-000000000811",

@@ -1397,3 +1397,23 @@ v0.1.0 GitHub 首版发布前准备。用户已确认现有产品、UI 与基础
   Reduce Motion/Transparency 和键盘/VoiceOver 路径。
 - `.superpowers/` 只保存本地视觉 brainstorming 伴侣内容，已加入 `.gitignore`，不得提交。
 - 本轮是设计基线，没有实现拖拽代码、没有运行功能测试，也未修改 `HANDOFF.md`。
+
+## 2026-07-30：实现普通事件 Lens Core 空间拖拽
+
+- `ScheduleManagementUseCase` 新增只读重排预演：一次读取活动排程后，对全部候选索引调用
+  Domain 正式 `reorder` 规则，返回请求位置、实际位置和不可移动事件阻挡回退信息；预演不调用
+  Repository 写入。
+- Presentation 新增明确的 `idle → pressing → lifting → dragging → magnetized → settling →
+  committing/returning` 状态机、带迟滞的落点解析器和无文字 Lens Core。材质只使用连续
+  Liquid Glass、浅层流体折射、偏心高光和克制外部阴影，没有独立内凹圆盘或硬边暗环。
+- 管理页普通事件支持长按提起后拖拽。原行保留低存在感占位，Overlay 中的时间实体从 Capsule
+  缩为 Bubble，以短距离 Spring 滞后跟随；合法目标放大 `1.032` 并显示细微高光，释放后先磁吸
+  到领域预演的实际落点，再 Morph 回 Capsule，最后只提交一次正式重排。
+- 不可移动事件不启动本切片拖拽；编辑与拖拽互斥。领域规则发生回退时显示“最近可用位置”提示，
+  保存失败时实体返回原位。VoiceOver/键盘路径提供“上移/下移”动作。
+- Reduce Motion 关闭弹性追随并保留形态连续性；Reduce Transparency 使用不透明 ambient
+  表面。所有几何来自列表行坐标空间，没有读取设备屏幕尺寸、绝对 `.position/.offset` 或
+  `GeometryReader`。
+- 新增 Application 无写入预演测试和 Presentation 状态机、失败回原点、迟滞、普通事件资格及
+  目标放大强度测试。完整 Swift Package 为 18 个 suite、53 项测试全部通过，0 项失败；
+  `git diff --check` 与禁止布局 API 扫描通过。未修改 `HANDOFF.md`、Windows 或发布记录。

@@ -198,6 +198,41 @@ final class MacAppModel: ObservableObject {
         }
     }
 
+    func previewManagedScheduledReorder(
+        _ todoId: UUID
+    ) async throws -> [ManagementDropPreview] {
+        guard let persistence else { throw MacAppError.persistenceUnavailable }
+        return try await ScheduleManagementUseCase(
+            repository: persistence.scheduledTodos,
+            clock: SystemClock())
+            .previewReorder(todoId: todoId)
+            .map {
+                ManagementDropPreview(
+                    requestedIndex: $0.requestedIndex,
+                    actualIndex: $0.actualIndex,
+                    usedFallbackPosition: $0.usedFallbackPosition)
+            }
+    }
+
+    func reorderManagedScheduledTodo(
+        _ todoId: UUID,
+        requestedIndex: Int
+    ) async throws -> ManagementReorderOutcome {
+        guard let persistence else { throw MacAppError.persistenceUnavailable }
+        let result = try await ScheduleManagementUseCase(
+            repository: persistence.scheduledTodos,
+            clock: SystemClock())
+            .reorder(
+                todoId: todoId,
+                requestedIndex: requestedIndex)
+        managedScheduledItems = result.scheduledTodos.map(
+            ManagementScheduledItem.init)
+        try await refreshOpeningState()
+        return ManagementReorderOutcome(
+            actualIndex: result.actualIndex,
+            usedFallbackPosition: result.usedFallbackPosition)
+    }
+
     func deleteManagedFutureTodo(_ id: UUID) async throws {
         guard let persistence else { throw MacAppError.persistenceUnavailable }
         let records = try await FutureTodoManagementUseCase(
