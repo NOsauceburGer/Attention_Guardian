@@ -172,4 +172,19 @@ struct AdaptiveLayoutTests {
         #expect(AGMotion.spatialTargetScale >= 1.03)
         #expect(AGMotion.spatialTargetScale <= 1.035)
     }
+
+    @Test("Mac form controls are not draggable window background")
+    func macFormControlsCanReceiveInputFocus() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let chromeSource = try String(
+            contentsOf: packageRoot.appendingPathComponent(
+                "Sources/AttentionGuardianMacApp/NativeWindowChrome.swift"),
+            encoding: .utf8)
+
+        #expect(chromeSource.contains(
+            "window.isMovableByWindowBackground = false"))
+    }
 }

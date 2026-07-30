@@ -68,6 +68,7 @@ teaching.md
 
 # Local development tool state
 work/dotnet-cli/
+work/macos-validation/
 .superpowers/
 
 # Swift Package Manager

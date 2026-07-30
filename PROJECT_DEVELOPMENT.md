@@ -1417,3 +1417,23 @@ v0.1.0 GitHub 首版发布前准备。用户已确认现有产品、UI 与基础
 - 新增 Application 无写入预演测试和 Presentation 状态机、失败回原点、迟滞、普通事件资格及
   目标放大强度测试。完整 Swift Package 为 18 个 suite、53 项测试全部通过，0 项失败；
   `git diff --check` 与禁止布局 API 扫描通过。未修改 `HANDOFF.md`、Windows 或发布记录。
+
+## 2026-07-30：修复 macOS 表单输入焦点并建立标准 App 验收入口
+
+- 用户复验发现 `swift run` 开发窗口可点击进入添加表单，但名称输入不可靠，导致保存始终禁用。
+  调查确认 SwiftUI `TextField` 与绑定本身可写；问题来自两个宿主条件：透明窗口把全部背景声明
+  为可拖动区域，以及裸 SwiftPM 可执行程序不具备可被 UI 自动化稳定识别的标准 App Bundle。
+- `NativeWindowChrome` 关闭全窗口背景拖动，避免无边框表单控件的焦点被窗口移动命中策略抢占。
+- 新增 `apple/scripts/run-macos-validation.sh`：构建当前 Swift Package 产品、生成标准
+  `Info.plist` 与 Bundle Identifier、执行本地 ad-hoc 签名，并从忽略的
+  `work/macos-validation/` 启动 `.app`。该产物只用于本机验收，不提交。
+- 更新长期验收规则：macOS 输入/拖拽缺陷必须在标准 `.app` 中使用 Computer Use 完成真实用户
+  路径，输入类缺陷必须覆盖点击、键盘输入、保存和读取界面回读，不能再以 `swift run` 裸进程
+  或单元测试替代。
+- Computer Use 在标准验收版中实际点击名称输入框、键盘输入 `Drag Test`、点击保存，并在事件
+  管理页回读到同名普通事件。该事件保留在本地数据中供后续拖拽验收。
+- 固化脚本首次严格签名校验发现 Finder 扩展属性污染，已在签名前增加 `xattr -cr`。随后用脚本
+  生成的最终 `.app` 再次由 Computer Use 键盘输入 `Input Acceptance`、保存并在管理页回读；
+  当前本地保留两条验收事件，可直接用于下一步拖拽测试。
+- 输入焦点回归测试先在旧窗口配置上失败，修改后通过；完整 Swift 测试更新为 18 个 suite、
+  54 项全部通过。未修改 `HANDOFF.md`、Windows 或发布记录。
