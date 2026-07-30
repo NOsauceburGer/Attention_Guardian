@@ -172,6 +172,118 @@ calm 状态，不保留强高光、上浮或颜色脉冲。
 - VoiceOver、Full Keyboard Access、Dynamic Type、Increase Contrast、Reduce Motion 与
   Reduce Transparency 都必须有可验证降级。
 
+## Apple Spatial Drag and Drop
+
+Apple 事件管理页的普通当日待办使用“时间实体”空间拖拽。该交互的优先级是对象连续性、
+材质可信度和舒适的 Motion Design，不追求在同一阶段覆盖更多事件类型。第一阶段只允许普通
+事件拖拽；未来待办、孤立不可移动事件和不可移动连续组不启用本手势。
+
+### 物理隐喻与材质
+
+- 用户不是移动列表行，而是从时间空间中拿起一个时间单元，再把它放回新的位置。
+- Press 阶段先让原 Capsule 轻微缩小、下沉。压力很浅，只以连续材质中的克制
+  inner shadow 和偏心 specular highlight 表达；禁止实色凹坑、硬边内圈、独立圆盘或
+  非 Liquid Glass 阴影。
+- Lift 后 Capsule 收拢为无文字、无图标、无时长的圆形 `Lens Core` Bubble。iPhone 上
+  Bubble 会被手指遮挡，因此它不承担内容识别，只表达“对象已被拿起”的空间状态。
+- Bubble 中心不是第二个物体。压力只留下一个很浅、无边界的流体折射密度变化；Lift 后痕迹
+  迅速减弱，只保留足以说明玻璃厚度的 inner shadow 与 specular highlight。
+- Bubble 外阴影必须克制，只说明它已离开列表平面。禁止厚黑影、发光圆环、霓虹边缘、
+  实色核心或把压力痕迹画成明显内凹球。
+- Release 时内部扰动随 Bubble 展宽自然摊平，不单独播放“凹陷消失”动画；最终恢复平静
+  Capsule 材质。
+
+### 拖拽状态机
+
+拖拽必须使用明确且可测试的单向状态机：
+
+```text
+idle
+→ pressing
+→ lifting
+→ dragging
+→ magnetized
+→ settling
+→ committing
+→ idle
+```
+
+持久化或目标解析失败时从当前活动状态进入 `returning`，Bubble 回到原占位并展开为 Capsule，
+随后回到 `idle`。任何时刻只有一个普通事件可以进入活动拖拽状态；编辑展开状态与拖拽状态互斥。
+
+- `pressing`：确认浅压力，不改变排程或列表顺序。
+- `lifting`：原位置保留与原 Capsule 完全相同的占位空间；活动对象进入列表上方 Overlay，
+  通过共享几何身份从 Capsule 收拢为 Bubble。
+- `dragging`：手势提供原始位置，视觉 Bubble 使用短距离 Spring 滞后形成 Calm Magnet
+  弹性跟随，不机械贴合指针，也不积累影响可控性的长尾延迟。
+- `magnetized`：进入合法目标带后锁定稳定目标；小范围指针抖动不得让目标在相邻位置间闪烁。
+- `settling`：释放后 Bubble 先吸附实际落点，再从中心向两侧展开。
+- `committing`：Application 完成整组排程写入；视觉对象保持落位身份，不提前生成第二张卡片。
+- `returning`：失败或取消时回到原占位，原时间表保持不变。
+
+### 布局、占位与坐标
+
+- 使用独立 Overlay 承载活动 Bubble，原列表只保留占位。Bubble 不受 `ScrollView` 或单行
+  Capsule 裁切，列表不会因活动对象离开而塌陷。
+- 使用 SwiftUI Anchor/Preference 采样当前内容自身的行区域和插入区域，并在命名局部坐标空间
+  中解析。不得读取 `UIScreen`、`NSScreen`，不得使用截图坐标、固定屏幕位置或
+  `GeometryReader` 手算整页布局。
+- `matchedGeometryEffect` 或等价原生共享几何机制维持同一对象身份。开始和落位不得通过
+  删除旧 View、在目标处突然新建 View 来伪造 Morph。
+- 原占位保持真实高度、间距和圆角，不以整表频繁重建制造跳动。
+
+### 弹性跟随与目标反馈
+
+- 跟随采用已确认的 `Calm Magnet` 强度：Bubble 与手势之间保留短距离、充分阻尼的弹性滞后。
+  它必须比直接贴手更有实体感，但明显弱于 macOS Dock 的拉伸和拖尾。
+- 目标反馈介于 Calm Magnet 与 Dock 强度之间。目标 Capsule 或插入占位建议放大约
+  `3%–3.5%`，最终数值以真实 macOS/iPhone 观感校准，不作为不可调整常量。
+- 目标位置使用低对比边缘清晰度、有限 specular highlight、轻微磁吸和邻近空间让位表达。
+  不使用强烈颜色变化、实心高亮、发光描边或持续脉冲。
+- 目标解析必须使用迟滞区。进入目标后，只有跨过相邻目标的稳定阈值才切换，避免指针或手指
+  微小抖动造成闪烁。
+
+### 真实落点与业务规则
+
+- Presentation 不计算排程、不可移动挡板或实际落点。
+- Lift 开始后，Mac/iOS App 组合层调用 Application；Application 使用既有 Domain
+  `ScheduleManagement.reorder` 对所有候选索引生成无写入预览。
+- 每个候选预览包含请求索引、Domain 实际索引和是否使用回落位置。Bubble 从拖拽过程中就磁吸
+  Domain 的真实可落位置，避免释放后才突然越过不可移动事件。
+- Drop 后只调用一次正式重排与整组持久化。若实际位置与请求位置不同，落位到真实位置并显示
+  “这个事件没办法放在这里”。
+- 预览、取消和失败均不得写数据库；正式成功仍保持持续时间、稳定标识、录入优先级和历史状态。
+
+### 平台输入与可访问性
+
+- macOS 使用指针拖拽、Hover 和键盘移动；iOS 使用短 Press→Lift 后的触控拖拽，并避免与
+  `ScrollView` 垂直滚动发生不可控竞争。
+- 普通事件必须提供与拖拽等价的“上移 / 下移”键盘和 VoiceOver 操作；这些路径调用同一
+  Application 重排，不维护第二套规则。
+- 不可拖拽事件应有明确可访问状态，不能只通过手势无响应或颜色表达限制。
+- Reduce Motion 开启时取消弹性尾随、形态拉伸、overshoot 和邻近让位；仍保留原位占位、
+  目标轮廓、确定落位与完整键盘路径。
+- Reduce Transparency 开启时，Lens Core 和 Capsule 降级为具有明确厚度、边缘、内层次和
+  对比度的冷色实体表面，不使用透明度降低整个内容层。
+
+### 动画完成与错误恢复
+
+- 手势结束不等于立即重建列表。Bubble 必须先完成目标吸附和 Bubble→Capsule 展开，再由最终
+  数据确认稳定列表。
+- Spring 快速响应、阻尼充分，最多一次很小回落。不得连续弹跳、旋转或出现弹性橡皮筋拖尾。
+- 正式重排失败时，Bubble 沿同一共享几何身份返回原占位；错误使用普通用户文案，不能把
+  Repository、SQLite 或堆栈信息暴露到 UI。
+- 应用进入后台、页面离开或活动事项在拖拽中失效时，取消拖拽并恢复原位，不提交半完成计划。
+
+### 验证门槛
+
+- 纯 Presentation 测试覆盖状态机合法转换、单活动对象、目标迟滞、取消和失败返回。
+- Application 测试覆盖候选预览零写入、预览实际索引与正式重排一致、正式写入一次和回落标识。
+- 交互测试或可替换协调器测试覆盖键盘上移/下移与拖拽调用同一重排入口。
+- 完整 Swift 回归之外，必须在真实 macOS 窗口检查指针跟随、ScrollView 裁切、目标稳定和
+  Bubble→Capsule 连续性；正式 iOS target 建立后补触控遮挡、滚动竞争、Reduce Motion、
+  Reduce Transparency、VoiceOver 和不同 Dynamic Type 的真机矩阵。
+
 ## Apple Design Review Gate
 
 每个 SwiftUI 页面或组件在进入实现前必须回答：

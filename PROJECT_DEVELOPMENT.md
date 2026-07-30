@@ -1383,3 +1383,17 @@ v0.1.0 GitHub 首版发布前准备。用户已确认现有产品、UI 与基础
   完整 Swift Package 为 18 个 suite、46 项测试全部通过，0 项失败，Mac App 成功链接。
 - Presentation/Mac App 禁止绝对定位检查和 `git diff --check` 均通过。未修改 `HANDOFF.md`，
   未改 Windows、发布记录或共享规则。
+
+## 2026-07-30：确认 Apple Lens Core 空间拖拽设计
+
+- 用户明确把 Ambient/Motion Design 舒适度置于功能数量之前，并授权后续同类视觉实现由 Agent
+  选择最终效果最优方案；本阶段只覆盖普通当日待办，不抢先实现不可移动连续组拖拽。
+- 通过视觉对比确认无文字 `Lens Core` Bubble。压力痕迹不使用独立内凹圆盘，而是同一
+  Liquid Glass 材质中的浅 inner shadow、偏心 specular highlight 和连续流体折射变化。
+- 跟随采用 Calm Magnet 短距离弹性滞后；目标放大使用介于 Calm Magnet 与 Dock 之间的克制
+  强度，建议约 3%–3.5%，并保留真实设备校准空间。
+- `DESIGN.md` 增加完整 Apple Spatial Drag and Drop 规范，锁定状态机、Overlay/Anchor 布局、
+  原位占位、共享几何 Morph、Application/Domain 无写入落点预览、目标迟滞、错误返回以及
+  Reduce Motion/Transparency 和键盘/VoiceOver 路径。
+- `.superpowers/` 只保存本地视觉 brainstorming 伴侣内容，已加入 `.gitignore`，不得提交。
+- 本轮是设计基线，没有实现拖拽代码、没有运行功能测试，也未修改 `HANDOFF.md`。
