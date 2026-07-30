@@ -21,6 +21,7 @@ struct MacRootView: View {
             case .manage:
                 ManagementSurface(
                     scheduledItems: model.managedScheduledItems,
+                    mandatoryGroups: model.managedMandatoryGroups,
                     futureItems: model.managedFutureItems,
                     isLoading: model.isManagementLoading,
                     onLoadFutureTodos: model.loadManagedFutureTodos,

@@ -15,9 +15,19 @@ public struct ManagementDisplayState: Equatable, Sendable {
 
 public struct ManagementScheduledItem: Identifiable, Equatable, Sendable {
     public let todo: ScheduledTodo
+    public let allowsMandatoryGroupDrag: Bool
 
     public init(todo: ScheduledTodo) {
         self.todo = todo
+        allowsMandatoryGroupDrag = false
+    }
+
+    public init(
+        todo: ScheduledTodo,
+        allowsMandatoryGroupDrag: Bool
+    ) {
+        self.todo = todo
+        self.allowsMandatoryGroupDrag = allowsMandatoryGroupDrag
     }
 
     public var id: UUID { todo.id }
@@ -25,7 +35,47 @@ public struct ManagementScheduledItem: Identifiable, Equatable, Sendable {
     public var start: Date { todo.start }
     public var isMandatory: Bool { todo.isMandatory }
     public var isBreak: Bool { todo.title == ScheduleManagement.breakTitle }
-    public var isSpatiallyDraggable: Bool { !todo.isMandatory }
+    public var isSpatiallyDraggable: Bool {
+        !todo.isMandatory || allowsMandatoryGroupDrag
+    }
+}
+
+public struct ManagementScheduleRow: Identifiable, Equatable, Sendable {
+    public let items: [ManagementScheduledItem]
+
+    public var id: UUID { items[0].id }
+}
+
+public enum ManagementScheduleLayout {
+    public static func rows(
+        items: [ManagementScheduledItem],
+        mandatoryGroups: [[UUID]]
+    ) -> [ManagementScheduleRow] {
+        let groupByTodo = Dictionary(uniqueKeysWithValues:
+            mandatoryGroups.flatMap { group in
+                group.map { ($0, group) }
+            })
+        var consumed = Set<UUID>()
+        var rows: [ManagementScheduleRow] = []
+        for item in items where !consumed.contains(item.id) {
+            guard let groupIds = groupByTodo[item.id] else {
+                rows.append(ManagementScheduleRow(items: [item]))
+                consumed.insert(item.id)
+                continue
+            }
+            let groupSet = Set(groupIds)
+            let groupItems = items
+                .filter { groupSet.contains($0.id) }
+                .map {
+                    ManagementScheduledItem(
+                        todo: $0.todo,
+                        allowsMandatoryGroupDrag: true)
+                }
+            rows.append(ManagementScheduleRow(items: groupItems))
+            consumed.formUnion(groupIds)
+        }
+        return rows
+    }
 }
 
 public struct ManagementFutureItem: Identifiable, Equatable, Sendable {
@@ -89,6 +139,7 @@ public struct ManagementSurface: View {
     private var reduceMotion
 
     private let scheduledItems: [ManagementScheduledItem]
+    private let mandatoryGroups: [[UUID]]
     private let futureItems: [ManagementFutureItem]?
     private let isLoading: Bool
     private let onLoadFutureTodos: () async -> Void
@@ -126,6 +177,7 @@ public struct ManagementSurface: View {
 
     public init(
         scheduledItems: [ManagementScheduledItem],
+        mandatoryGroups: [[UUID]] = [],
         futureItems: [ManagementFutureItem]?,
         isLoading: Bool,
         onLoadFutureTodos: @escaping () async -> Void,
@@ -145,6 +197,7 @@ public struct ManagementSurface: View {
         onBack: @escaping () -> Void
     ) {
         self.scheduledItems = scheduledItems
+        self.mandatoryGroups = mandatoryGroups
         self.futureItems = futureItems
         self.isLoading = isLoading
         self.onLoadFutureTodos = onLoadFutureTodos
@@ -160,15 +213,26 @@ public struct ManagementSurface: View {
         ZStack {
             AmbientBackground(isFocused: false)
 
-            ScrollView {
-                VStack(spacing: AGSpace.section) {
-                    header
-                    scheduledSection
-                    futureSection
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: AGSpace.section) {
+                        header
+                        scheduledSection
+                        futureSection
+                    }
+                    .frame(maxWidth: AGLayout.readableMaximum)
+                    .padding(.horizontal, horizontalInset)
+                    .padding(.vertical, AGSpace.section)
                 }
-                .frame(maxWidth: AGLayout.readableMaximum)
-                .padding(.horizontal, horizontalInset)
-                .padding(.vertical, AGSpace.section)
+                .onChange(of: mandatoryGroups) { _, groups in
+                    guard let firstGroup = groups.first,
+                          let firstId = firstGroup.first else {
+                        return
+                    }
+                    withAnimation(reduceMotion ? nil : AGMotion.spatialFollow) {
+                        proxy.scrollTo(firstId, anchor: .center)
+                    }
+                }
             }
 
             spatialDragOverlay
@@ -337,14 +401,27 @@ public struct ManagementSurface: View {
             }
         } else {
             LazyVStack(spacing: AGSpace.related) {
-                ForEach(
-                    Array(scheduledItems.enumerated()),
-                    id: \.element.id
-                ) { index, item in
-                    scheduledBubble(item, index: index)
+                ForEach(scheduleRows) { row in
+                    HStack(spacing: AGSpace.related) {
+                        ForEach(row.items) { item in
+                            if let index = scheduledItems.firstIndex(
+                                where: { $0.id == item.id }) {
+                                scheduledBubble(item, index: index)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    .id(row.id)
+                    .accessibilityElement(children: .contain)
                 }
             }
         }
+    }
+
+    private var scheduleRows: [ManagementScheduleRow] {
+        ManagementScheduleLayout.rows(
+            items: scheduledItems,
+            mandatoryGroups: mandatoryGroups)
     }
 
     @ViewBuilder
@@ -365,6 +442,14 @@ public struct ManagementSurface: View {
                 }
             }
             .padding(AGSpace.component)
+        }
+        .background {
+            if item.isMandatory {
+                RoundedRectangle(
+                    cornerRadius: AGLayout.componentCornerRadius,
+                    style: .continuous)
+                    .fill(AGColor.mandatory.opacity(0.08))
+            }
         }
         .opacity(draggedTodoId == item.id ? 0.12 : 1)
         .scaleEffect(
@@ -803,8 +888,11 @@ public struct ManagementSurface: View {
             scheduledItems.enumerated().compactMap { rowIndex, row in
                 rowFrames[row.id].map { (rowIndex, $0) }
             })
+        let pointer = CGPoint(
+            x: (dragPressLocation?.x ?? origin.midX) + translation.width,
+            y: (dragPressLocation?.y ?? origin.midY) + translation.height)
         let resolved = SpatialDropResolver.target(
-            pointerY: origin.midY + translation.height,
+            pointer: pointer,
             currentTarget: dropTarget,
             rowFrames: indexedFrames,
             previews: dragPreviews,

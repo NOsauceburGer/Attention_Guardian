@@ -13,6 +13,7 @@ final class MacAppModel: ObservableObject {
     @Published var destination: GuardianDestination = .focus
     @Published private(set) var errorMessage: String?
     @Published private(set) var managedScheduledItems: [ManagementScheduledItem] = []
+    @Published private(set) var managedMandatoryGroups: [[UUID]] = []
     @Published private(set) var managedFutureItems: [ManagementFutureItem]?
     @Published private(set) var isManagementLoading = false
 
@@ -106,7 +107,7 @@ final class MacAppModel: ObservableObject {
                 repository: persistence.scheduledTodos,
                 clock: SystemClock())
                 .load()
-            managedScheduledItems = todos.map(ManagementScheduledItem.init)
+            setManagedSchedule(todos)
             errorMessage = nil
         } catch {
             errorMessage = "无法读取活动事项。请稍后重试。"
@@ -131,7 +132,7 @@ final class MacAppModel: ObservableObject {
             repository: persistence.scheduledTodos,
             clock: SystemClock())
             .delete(todoId: id)
-        managedScheduledItems = todos.map(ManagementScheduledItem.init)
+        setManagedSchedule(todos)
         try await refreshOpeningState()
     }
 
@@ -185,8 +186,7 @@ final class MacAppModel: ObservableObject {
         } ?? "另一事项"
         switch result.rejection {
         case .none:
-            managedScheduledItems = result.scheduledTodos.map(
-                ManagementScheduledItem.init)
+            setManagedSchedule(result.scheduledTodos)
             try await refreshOpeningState()
             return .saved
         case .conflictResolutionRequired:
@@ -225,8 +225,7 @@ final class MacAppModel: ObservableObject {
             .reorder(
                 todoId: todoId,
                 requestedIndex: requestedIndex)
-        managedScheduledItems = result.scheduledTodos.map(
-            ManagementScheduledItem.init)
+        setManagedSchedule(result.scheduledTodos)
         try await refreshOpeningState()
         return ManagementReorderOutcome(
             actualIndex: result.actualIndex,
@@ -239,6 +238,13 @@ final class MacAppModel: ObservableObject {
             repository: persistence.futureTodos)
             .delete(todoId: id, confirmed: true)
         managedFutureItems = records.map(ManagementFutureItem.init)
+    }
+
+    private func setManagedSchedule(_ todos: [ScheduledTodo]) {
+        managedScheduledItems = todos.map(ManagementScheduledItem.init)
+        managedMandatoryGroups = ScheduleManagement
+            .mandatoryContinuousGroups(todos)
+            .map { $0.map(\.id) }
     }
 
     private func refreshOpeningState() async throws {

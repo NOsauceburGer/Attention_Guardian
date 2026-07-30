@@ -154,7 +154,7 @@ public struct SpatialDragMachine: Equatable, Sendable {
 
 public enum SpatialDropResolver {
     public static func target(
-        pointerY: CGFloat,
+        pointer: CGPoint,
         currentTarget: ManagementResolvedDropTarget?,
         rowFrames: [Int: CGRect],
         previews: [ManagementDropPreview],
@@ -162,14 +162,15 @@ public enum SpatialDropResolver {
     ) -> ManagementResolvedDropTarget? {
         if let currentTarget,
            let currentFrame = rowFrames[currentTarget.actualIndex],
-           pointerY >= currentFrame.minY - hysteresis,
-           pointerY <= currentFrame.maxY + hysteresis {
+           currentFrame.insetBy(
+               dx: -hysteresis,
+               dy: -hysteresis).contains(pointer) {
             return currentTarget
         }
 
         guard let requestedIndex = rowFrames.min(by: {
-            abs($0.value.midY - pointerY)
-                < abs($1.value.midY - pointerY)
+            distance(from: pointer, to: $0.value)
+                < distance(from: pointer, to: $1.value)
         })?.key,
               let preview = previews.first(where: {
                   $0.requestedIndex == requestedIndex
@@ -180,6 +181,22 @@ public enum SpatialDropResolver {
             requestedIndex: preview.requestedIndex,
             actualIndex: preview.actualIndex,
             usedFallbackPosition: preview.usedFallbackPosition)
+    }
+
+    public static func target(
+        pointerY: CGFloat,
+        currentTarget: ManagementResolvedDropTarget?,
+        rowFrames: [Int: CGRect],
+        previews: [ManagementDropPreview],
+        hysteresis: CGFloat
+    ) -> ManagementResolvedDropTarget? {
+        let pointerX = rowFrames.values.first?.midX ?? 0
+        return target(
+            pointer: CGPoint(x: pointerX, y: pointerY),
+            currentTarget: currentTarget,
+            rowFrames: rowFrames,
+            previews: previews,
+            hysteresis: hysteresis)
     }
 
     public static func targetIndex(
@@ -204,6 +221,15 @@ public enum SpatialDropResolver {
             previews: previews,
             hysteresis: hysteresis)?
             .actualIndex
+    }
+
+    private static func distance(
+        from point: CGPoint,
+        to frame: CGRect
+    ) -> CGFloat {
+        let dx = max(frame.minX - point.x, 0, point.x - frame.maxX)
+        let dy = max(frame.minY - point.y, 0, point.y - frame.maxY)
+        return hypot(dx, dy)
     }
 }
 

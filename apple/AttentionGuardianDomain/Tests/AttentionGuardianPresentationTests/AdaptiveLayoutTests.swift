@@ -144,6 +144,33 @@ struct AdaptiveLayoutTests {
         #expect(target == 0)
     }
 
+    @Test("target resolver distinguishes items that share one row")
+    func targetResolverUsesHorizontalPosition() {
+        let frames = [
+            0: CGRect(x: 0, y: 0, width: 140, height: 50),
+            1: CGRect(x: 152, y: 0, width: 140, height: 50)
+        ]
+        let previews = [
+            ManagementDropPreview(
+                requestedIndex: 0,
+                actualIndex: 0,
+                usedFallbackPosition: false),
+            ManagementDropPreview(
+                requestedIndex: 1,
+                actualIndex: 1,
+                usedFallbackPosition: false)
+        ]
+
+        let target = SpatialDropResolver.target(
+            pointer: CGPoint(x: 230, y: 25),
+            currentTarget: nil,
+            rowFrames: frames,
+            previews: previews,
+            hysteresis: 8)
+
+        #expect(target?.actualIndex == 1)
+    }
+
     @Test("only ordinary scheduled items can start spatial drag")
     func ordinaryOnlySpatialDrag() throws {
         let start = Date(timeIntervalSince1970: 1_775_410_000)
@@ -165,6 +192,39 @@ struct AdaptiveLayoutTests {
             todo: ordinary).isSpatiallyDraggable)
         #expect(!ManagementScheduledItem(
             todo: mandatory).isSpatiallyDraggable)
+        #expect(ManagementScheduledItem(
+            todo: mandatory,
+            allowsMandatoryGroupDrag: true).isSpatiallyDraggable)
+    }
+
+    @Test("continuous mandatory group shares one layout row")
+    func mandatoryGroupLayout() throws {
+        let start = Date(timeIntervalSince1970: 1_775_420_000)
+        let first = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000907")),
+            title: "固定一",
+            start: start,
+            end: start.addingTimeInterval(1_800),
+            isMandatory: true)
+        let second = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000908")),
+            title: "固定二",
+            start: first.end,
+            end: first.end.addingTimeInterval(1_800),
+            isMandatory: true)
+
+        let rows = ManagementScheduleLayout.rows(
+            items: [
+                ManagementScheduledItem(todo: first),
+                ManagementScheduledItem(todo: second)
+            ],
+            mandatoryGroups: [[first.id, second.id]])
+
+        #expect(rows.count == 1)
+        #expect(rows[0].items.map(\.id) == [first.id, second.id])
+        #expect(rows[0].items.allSatisfy { $0.isSpatiallyDraggable })
     }
 
     @Test("spatial target scale stays calm but perceptible")

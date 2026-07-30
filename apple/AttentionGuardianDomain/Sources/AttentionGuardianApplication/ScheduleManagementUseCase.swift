@@ -54,16 +54,22 @@ public struct ScheduleManagementUseCase: Sendable {
         todoId: UUID
     ) async throws -> [ScheduleReorderPreview] {
         let context = try await loadContext()
-        return try context.active.indices.map { requestedIndex in
-            let result = try ScheduleManagement.reorder(
-                context.active,
-                todoId: todoId,
-                requestedIndex: requestedIndex)
-            return ScheduleReorderPreview(
-                requestedIndex: requestedIndex,
-                actualIndex: result.actualIndex,
-                usedFallbackPosition: result.usedFallbackPosition)
+        var previews: [ScheduleReorderPreview] = []
+        for requestedIndex in context.active.indices {
+            do {
+                let result = try ScheduleManagement.reorder(
+                    context.active,
+                    todoId: todoId,
+                    requestedIndex: requestedIndex)
+                previews.append(ScheduleReorderPreview(
+                    requestedIndex: requestedIndex,
+                    actualIndex: result.actualIndex,
+                    usedFallbackPosition: result.usedFallbackPosition))
+            } catch ScheduleManagementError.mandatoryMoveOutsideContinuousGroup {
+                continue
+            }
         }
+        return previews
     }
 
     public func edit(

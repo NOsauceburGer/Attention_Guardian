@@ -33,6 +33,12 @@ public struct ScheduleStartEditResult: Equatable, Sendable {
 public enum ScheduleManagement {
     public static let breakTitle = "休息"
 
+    public static func mandatoryContinuousGroups(
+        _ schedule: [ScheduledTodo]
+    ) -> [[ScheduledTodo]] {
+        mandatoryGroups(schedule)
+    }
+
     public static func reorder(
         _ schedule: [ScheduledTodo],
         todoId: UUID,

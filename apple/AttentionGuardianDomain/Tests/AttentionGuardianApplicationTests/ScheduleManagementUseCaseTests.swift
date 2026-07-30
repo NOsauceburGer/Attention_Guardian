@@ -108,6 +108,42 @@ struct ScheduleManagementUseCaseTests {
     }
 
     @Test
+    func mandatoryReorderPreviewIncludesOnlyItsContinuousGroup() async throws {
+        let now = Date(timeIntervalSince1970: 1_775_307_000)
+        let first = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000808")),
+            title: "固定一",
+            start: now,
+            end: now.addingTimeInterval(1_800),
+            isMandatory: true)
+        let second = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000809")),
+            title: "固定二",
+            start: first.end,
+            end: first.end.addingTimeInterval(1_800),
+            isMandatory: true)
+        let ordinary = try item(
+            "00000000-0000-0000-0000-000000000810",
+            "普通", second.end, 1_800)
+        let repository = ScheduledTodoRepositoryFake(records: [
+            ScheduledTodoRecord(todo: first),
+            ScheduledTodoRecord(todo: second),
+            ScheduledTodoRecord(todo: ordinary)
+        ])
+        let service = ScheduleManagementUseCase(
+            repository: repository,
+            clock: FixedClock(now: now.addingTimeInterval(-60)))
+
+        let previews = try await service.previewReorder(todoId: first.id)
+
+        #expect(previews.map(\.requestedIndex) == [0, 1])
+        #expect(previews.map(\.actualIndex) == [0, 1])
+        #expect(repository.replacements.isEmpty)
+    }
+
+    @Test
     func rejectedStartEditDoesNotWrite() async throws {
         let now = Date(timeIntervalSince1970: 1_775_310_000)
         let moving = try item("00000000-0000-0000-0000-000000000811",
