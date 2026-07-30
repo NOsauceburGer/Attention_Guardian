@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AttentionGuardian.Application/AttentionGuardian.Application.csproj" />
+    <Project Path="src/AttentionGuardian.Core/AttentionGuardian.Core.csproj" />
+    <Project Path="src/AttentionGuardian.Desktop/AttentionGuardian.Desktop.csproj" />
+    <Project Path="src/AttentionGuardian.Infrastructure/AttentionGuardian.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AttentionGuardian.Application.Tests/AttentionGuardian.Application.Tests.csproj" />
+    <Project Path="tests/AttentionGuardian.Core.Tests/AttentionGuardian.Core.Tests.csproj" />
+    <Project Path="tests/AttentionGuardian.Desktop.Tests/AttentionGuardian.Desktop.Tests.csproj" />
+    <Project Path="tests/AttentionGuardian.Infrastructure.Tests/AttentionGuardian.Infrastructure.Tests.csproj" />
+    <Project Path="tests/AttentionGuardian.SharedVectors.Tests/AttentionGuardian.SharedVectors.Tests.csproj" />
+  </Folder>
+</Solution>

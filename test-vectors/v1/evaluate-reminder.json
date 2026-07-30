@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "operation": "evaluateReminder",
+  "cases": [
+    {
+      "id": "eligible-at-five-minute-boundary",
+      "input": {
+        "now": "2026-07-29T09:55:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000201",
+            "title": "当前任务",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000202",
+            "title": "下一任务",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T10:30:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": {
+        "shouldNotifyNow": true,
+        "ineligibility": "none",
+        "currentTodoId": "00000000-0000-0000-0000-000000000201",
+        "nextTodoId": "00000000-0000-0000-0000-000000000202"
+      }
+    },
+    {
+      "id": "no-current-todo",
+      "input": { "now": "2026-07-29T08:00:00+08:00", "schedule": [] },
+      "expected": {
+        "shouldNotifyNow": false,
+        "ineligibility": "noCurrentTodo",
+        "currentTodoId": null,
+        "nextTodoId": null
+      }
+    },
+    {
+      "id": "current-too-short",
+      "input": {
+        "now": "2026-07-29T09:00:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000211",
+            "title": "短任务",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T09:04:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": {
+        "shouldNotifyNow": false,
+        "ineligibility": "currentTodoTooShort",
+        "currentTodoId": "00000000-0000-0000-0000-000000000211",
+        "nextTodoId": null
+      }
+    },
+    {
+      "id": "no-adjacent-next",
+      "input": {
+        "now": "2026-07-29T09:56:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000221",
+            "title": "当前任务",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": {
+        "shouldNotifyNow": false,
+        "ineligibility": "noAdjacentNextTodo",
+        "currentTodoId": "00000000-0000-0000-0000-000000000221",
+        "nextTodoId": null
+      }
+    },
+    {
+      "id": "next-is-break",
+      "input": {
+        "now": "2026-07-29T09:56:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000231",
+            "title": "当前任务",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000232",
+            "title": "休息",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T10:20:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": {
+        "shouldNotifyNow": false,
+        "ineligibility": "nextTodoIsBreak",
+        "currentTodoId": "00000000-0000-0000-0000-000000000231",
+        "nextTodoId": "00000000-0000-0000-0000-000000000232"
+      }
+    },
+    {
+      "id": "outside-window",
+      "input": {
+        "now": "2026-07-29T09:54:59+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000241",
+            "title": "当前任务",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000242",
+            "title": "下一任务",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T10:30:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": {
+        "shouldNotifyNow": false,
+        "ineligibility": "outsideReminderWindow",
+        "currentTodoId": "00000000-0000-0000-0000-000000000241",
+        "nextTodoId": "00000000-0000-0000-0000-000000000242"
+      }
+    }
+  ]
+}

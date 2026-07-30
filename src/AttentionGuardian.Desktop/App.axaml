@@ -1,0 +1,325 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AttentionGuardian.Desktop.App"
+             xmlns:local="using:AttentionGuardian.Desktop"
+             RequestedThemeVariant="Dark">
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+    <Application.Resources>
+        <SolidColorBrush x:Key="AppBackgroundBrush" Color="#111418" />
+        <SolidColorBrush x:Key="InkBrush" Color="#F0F3F6" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#A8B0BA" />
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#5AA7F5" />
+        <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#3C8AD8" />
+        <SolidColorBrush x:Key="GlassBrush" Color="#332A3B48" />
+        <SolidColorBrush x:Key="GlassStrongBrush" Color="#3D2A3B48" />
+        <SolidColorBrush x:Key="GlassEdgeBrush" Color="#42E5F5FF" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#332A3B48" />
+        <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#4936505F" />
+        <SolidColorBrush x:Key="SeparatorBrush" Color="#18FFFFFF" />
+        <SolidColorBrush x:Key="MandatoryBrush" Color="#D85B55" />
+        <SolidColorBrush x:Key="RestBrush" Color="#8CCFC1" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#F0C86B" />
+        <SolidColorBrush x:Key="ErrorBrush" Color="#B63C38" />
+    </Application.Resources>
+    <Application.Styles>
+        <FluentTheme />
+        <Style Selector="Window">
+            <Setter Property="FontFamily" Value="Segoe UI Variable, Segoe UI" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        </Style>
+        <Style Selector="TextBlock.PageTitle">
+            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="37" />
+        </Style>
+        <Style Selector="TextBlock.FormTitle">
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="34" />
+        </Style>
+        <Style Selector="TextBlock.SectionTitle">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="25" />
+        </Style>
+        <Style Selector="TextBlock.Body">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="LineHeight" Value="24" />
+        </Style>
+        <Style Selector="TextBlock.Secondary">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="LineHeight" Value="21" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.Caption">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="LineHeight" Value="18" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.StatusLabel">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="18" />
+        </Style>
+        <Style Selector="TextBlock.FieldLabel">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="20" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="18,9" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" />
+                    <BrushTransition Property="Background" Duration="0:0:0.16" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="RenderTransform" Value="translateY(-1px)" />
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.975) translateY(1px)" />
+        </Style>
+        <Style Selector="Button.Primary">
+            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.Primary:pointerover">
+            <Setter Property="Background" Value="#68B3FF" />
+        </Style>
+        <Style Selector="Button.Primary:pressed">
+            <Setter Property="Background" Value="{DynamicResource PrimaryPressedBrush}" />
+        </Style>
+        <Style Selector="Ellipse.AmbientOrbit">
+            <Setter Property="Stroke" Value="#20EAF7FF" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="Button.FocusEntry">
+            <Setter Property="Width" Value="164" />
+            <Setter Property="Height" Value="164" />
+            <Setter Property="MinWidth" Value="164" />
+            <Setter Property="MinHeight" Value="164" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="82" />
+            <Setter Property="Background" Value="#244B86A8" />
+            <Setter Property="BorderBrush" Value="#B8E7F6FF" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="Foreground" Value="#F5FAFD" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LetterSpacing" Value="2" />
+        </Style>
+        <Style Selector="Button.FocusEntry:pointerover">
+            <Setter Property="Background" Value="#365D96B5" />
+            <Setter Property="BorderBrush" Value="#F2F8FDFF" />
+            <Setter Property="RenderTransform" Value="scale(1.018) translateY(-1px)" />
+        </Style>
+        <Style Selector="Button.FocusEntry:focus">
+            <Setter Property="BorderBrush" Value="#FFFFFFFF" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="Button.FocusEntry:pressed">
+            <Setter Property="Background" Value="#31527F9B" />
+            <Setter Property="RenderTransform" Value="scale(0.975) translateY(1px)" />
+        </Style>
+        <Style Selector="Button.Glass">
+            <Setter Property="Background" Value="{DynamicResource GlassStrongBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource GlassEdgeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Button.RelativeDateOption">
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Background" Value="#1FFFFFFF" />
+            <Setter Property="BorderBrush" Value="#30FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Button.RelativeDateOption:pointerover">
+            <Setter Property="Background" Value="#2DFFFFFF" />
+            <Setter Property="BorderBrush" Value="#665AA7F5" />
+        </Style>
+        <Style Selector="Button.RelativeDateOption.Selected">
+            <Setter Property="Background" Value="#465AA7F5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.Nav">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="18,6" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        <Style Selector="Button.Nav:pointerover">
+            <Setter Property="Background" Value="#22FFFFFF" />
+        </Style>
+        <Style Selector="Button.Nav:focus">
+            <Setter Property="Background" Value="#2B4B94E8" />
+        </Style>
+        <Style Selector="Button.WindowControl">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Background" Value="#4D2A3B48" />
+            <Setter Property="BorderBrush" Value="#42E5F5FF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#E8F0F7" />
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="Medium" />
+        </Style>
+        <Style Selector="Button.WindowControl:pointerover">
+            <Setter Property="Background" Value="#6636505F" />
+        </Style>
+        <Style Selector="Button.WindowControl.Close:pointerover">
+            <Setter Property="Background" Value="#D95E3438" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="TextBox, DatePicker, TimePicker, NumericUpDown, ComboBox">
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource GlassEdgeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="SelectionBrush" Value="#665AA7F5" />
+            <Setter Property="SelectionForegroundBrush" Value="White" />
+            <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform"
+                                                   Duration="0:0:0.18" />
+                    <BrushTransition Property="BorderBrush"
+                                     Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="TextBox:pointerover">
+            <Setter Property="Background" Value="#0FFFFFFF" />
+            <Setter Property="BorderBrush" Value="#66E5F5FF" />
+        </Style>
+        <Style Selector="TextBox /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox /template/ Border#PART_Border">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox:focus">
+            <Setter Property="Background" Value="#12FFFFFF" />
+            <Setter Property="BorderBrush" Value="#B85AA7F5" />
+            <Setter Property="RenderTransform" Value="scale(1.006) translateY(-1px)" />
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BoxShadow" Value="0 6 8 0 #38205072" />
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BoxShadow" Value="0 6 8 0 #38205072" />
+        </Style>
+        <Style Selector="DatePicker, TimePicker, NumericUpDown, ComboBox">
+            <Setter Property="Background" Value="#332A3B48" />
+            <Setter Property="BorderBrush" Value="{DynamicResource GlassEdgeBrush}" />
+        </Style>
+        <Style Selector="ComboBox.Compact">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ComboBoxItem">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="14,9" />
+            <Setter Property="Margin" Value="4,2" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="ComboBoxItem:pointerover">
+            <Setter Property="Background" Value="#2DFFFFFF" />
+        </Style>
+        <Style Selector="ComboBoxItem:selected">
+            <Setter Property="Background" Value="#3D5AA7F5" />
+        </Style>
+        <Style Selector="ComboBox /template/ Popup#PART_Popup > Border">
+            <Setter Property="Background" Value="#66263541" />
+            <Setter Property="BorderBrush" Value="{DynamicResource GlassEdgeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="4" />
+        </Style>
+        <Style Selector="Border.Glass">
+            <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource GlassEdgeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BoxShadow" Value="0 4 8 0 #22070D12" />
+        </Style>
+        <Style Selector="Border.AlertGlass">
+            <Setter Property="Background" Value="#332A3B48" />
+            <Setter Property="BorderBrush" Value="#42E5F5FF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BoxShadow" Value="0 4 8 0 #22070D12" />
+            <Setter Property="Width" Value="430" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.BubbleEditor">
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="Border.ChoiceRow">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BoxShadow" Value="0 4 8 0 #22070D12" />
+        </Style>
+        <Style Selector="Border.ChoiceRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+            <Setter Property="BorderBrush" Value="#3D5AA7F5" />
+        </Style>
+        <Style Selector="Border.Surface">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="#33FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BoxShadow" Value="0 5 8 0 #26070D12" />
+        </Style>
+        <Style Selector="Border.ScheduledBubble.DropTarget">
+            <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="Border.RestDropZone.DropTarget">
+            <Setter Property="BorderBrush" Value="{DynamicResource RestBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="Border.ScheduledBubble.Mandatory">
+            <Setter Property="Background" Value="#33D85B55" />
+            <Setter Property="BorderBrush" Value="#88D85B55" />
+        </Style>
+        <Style Selector="Border.ScheduledBubble.Rest">
+            <Setter Property="Background" Value="#558CCFC1" />
+            <Setter Property="BorderBrush" Value="#888CCFC1" />
+        </Style>
+    </Application.Styles>
+</Application>

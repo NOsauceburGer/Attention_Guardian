@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AttentionGuardian.Desktop.Controls.GlassPicker"
+             x:Name="Picker"
+             MinHeight="44">
+    <UserControl.Styles>
+        <Style Selector="Button#Trigger /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="Button#Trigger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button#Trigger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </UserControl.Styles>
+    <Grid>
+        <Border CornerRadius="11"
+                BorderBrush="#42E5F5FF"
+                BorderThickness="1"
+                BoxShadow="0 4 8 0 #24070D12"
+                IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                    <GradientStop Color="#303C6074" Offset="0" />
+                    <GradientStop Color="#332A3B48" Offset="0.38" />
+                    <GradientStop Color="#3826333F" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+        <Button x:Name="Trigger" Click="OpenPicker" Padding="0"
+                MinWidth="0" MinHeight="44"
+                HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch"
+                Background="Transparent" BorderThickness="0" CornerRadius="11"
+                AutomationProperties.Name="{Binding Label, ElementName=Picker}">
+            <Grid ColumnDefinitions="28,*,28"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch">
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SelectedItem, ElementName=Picker}"
+                           FontSize="16"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource InkBrush}" />
+                <PathIcon Grid.Column="2" Width="11" Height="11"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Foreground="{DynamicResource MutedTextBrush}"
+                           Data="M 2,4 L 6,8 L 10,4 L 11,5 L 6,10 L 1,5 Z" />
+            </Grid>
+        </Button>
+
+        <Popup x:Name="PickerPopup"
+               PlacementTarget="{Binding ElementName=Trigger}"
+               Placement="BottomEdgeAlignedLeft"
+               VerticalOffset="8"
+               IsLightDismissEnabled="True"
+               ShouldUseOverlayLayer="True">
+            <Grid MinWidth="{Binding PopupWidth, ElementName=Picker}">
+                <Border BorderBrush="#42E5F5FF" BorderThickness="1"
+                        CornerRadius="14" Padding="5"
+                        Background="#66263541"
+                        BoxShadow="0 6 8 0 #28070D12">
+                    <ScrollViewer MaxHeight="268"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ListBox ItemsSource="{Binding ItemsSource, ElementName=Picker}"
+                                 SelectedItem="{Binding SelectedItem, ElementName=Picker, Mode=TwoWay}"
+                                 SelectionChanged="PickerSelectionChanged"
+                                 Background="Transparent">
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="MinHeight" Value="42" />
+                                    <Setter Property="Padding" Value="14,9" />
+                                    <Setter Property="Margin" Value="2" />
+                                    <Setter Property="CornerRadius" Value="9" />
+                                    <Setter Property="FontSize" Value="16" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="Foreground" Value="#F3F6F8" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover">
+                                    <Setter Property="Background" Value="#20FFFFFF" />
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="#20FFFFFF" />
+                                </Style>
+                                <Style Selector="ListBoxItem:selected">
+                                    <Setter Property="Background" Value="#2E5AA7F5" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Style>
+                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="#2E5AA7F5" />
+                                </Style>
+                            </ListBox.Styles>
+                        </ListBox>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Popup>
+    </Grid>
+</UserControl>

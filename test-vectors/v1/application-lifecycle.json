@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "operation": "applicationLifecycle",
+  "cases": [
+    {
+      "id": "planning-retry-is-idempotent",
+      "input": {
+        "action": "planTwice",
+        "failFirstMarkPlanned": true,
+        "futureTodo": {
+          "id": "00000000-0000-0000-0000-000000000401",
+          "title": "需要规划",
+          "scheduledDate": "2026-07-29",
+          "isMandatory": false
+        },
+        "start": "2026-07-29T18:00:00+08:00",
+        "durationSeconds": 1800
+      },
+      "expected": {
+        "futureStatus": "planned",
+        "scheduledTodoId": "00000000-0000-0000-0000-000000000401",
+        "replaceCount": 1
+      }
+    },
+    {
+      "id": "unconfirmed-delete-keeps-active",
+      "input": {
+        "action": "deleteFuture",
+        "isConfirmed": false,
+        "futureTodo": {
+          "id": "00000000-0000-0000-0000-000000000411",
+          "title": "保留事项",
+          "scheduledDate": "2026-07-30",
+          "isMandatory": false
+        }
+      },
+      "expected": { "futureStatus": "active" }
+    },
+    {
+      "id": "confirmed-delete-is-distinct",
+      "input": {
+        "action": "deleteFuture",
+        "isConfirmed": true,
+        "futureTodo": {
+          "id": "00000000-0000-0000-0000-000000000412",
+          "title": "删除事项",
+          "scheduledDate": "2026-07-30",
+          "isMandatory": false
+        }
+      },
+      "expected": { "futureStatus": "deleted" }
+    },
+    {
+      "id": "natural-completion-preserves-history",
+      "input": {
+        "action": "loadManagement",
+        "now": "2026-07-29T12:00:00+08:00",
+        "scheduledTodos": [
+          {
+            "id": "00000000-0000-0000-0000-000000000421",
+            "title": "已自然完成",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T11:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000422",
+            "title": "仍然活动",
+            "start": "2026-07-29T12:00:00+08:00",
+            "end": "2026-07-29T13:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ]
+      },
+      "expected": {
+        "activeTodoIds": ["00000000-0000-0000-0000-000000000422"],
+        "history": [
+          {
+            "id": "00000000-0000-0000-0000-000000000421",
+            "status": "completed",
+            "completedAt": "2026-07-29T12:00:00+08:00"
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000422",
+            "status": "active",
+            "completedAt": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "opening-includes-overdue-and-due-future-todos",
+      "input": {
+        "action": "loadOpening",
+        "now": "2026-07-29T08:00:00+08:00",
+        "futureTodos": [
+          {
+            "id": "00000000-0000-0000-0000-000000000431",
+            "title": "逾期事项",
+            "scheduledDate": "2026-07-28",
+            "isMandatory": false
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000432",
+            "title": "今日事项",
+            "scheduledDate": "2026-07-29",
+            "isMandatory": false
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000433",
+            "title": "明日事项",
+            "scheduledDate": "2026-07-30",
+            "isMandatory": false
+          }
+        ]
+      },
+      "expected": {
+        "dueFutureTodoIds": [
+          "00000000-0000-0000-0000-000000000431",
+          "00000000-0000-0000-0000-000000000432"
+        ]
+      }
+    },
+    {
+      "id": "user-delete-is-not-natural-completion",
+      "input": {
+        "action": "deleteScheduled",
+        "now": "2026-07-29T09:00:00+08:00",
+        "todoId": "00000000-0000-0000-0000-000000000441",
+        "isConfirmed": true,
+        "scheduledTodos": [
+          {
+            "id": "00000000-0000-0000-0000-000000000441",
+            "title": "用户删除",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T11:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000442",
+            "title": "保留任务",
+            "start": "2026-07-29T11:00:00+08:00",
+            "end": "2026-07-29T12:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ]
+      },
+      "expected": {
+        "activeTodoIds": ["00000000-0000-0000-0000-000000000442"],
+        "history": [
+          {
+            "id": "00000000-0000-0000-0000-000000000441",
+            "status": "deleted",
+            "completedAt": null
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000442",
+            "status": "active",
+            "completedAt": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "completed-history-survives-plan-replacement",
+      "input": {
+        "action": "replaceSchedule",
+        "now": "2026-07-29T12:00:00+08:00",
+        "scheduledTodos": [
+          {
+            "id": "00000000-0000-0000-0000-000000000451",
+            "title": "已完成历史",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T11:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000452",
+            "title": "活动任务",
+            "start": "2026-07-29T12:00:00+08:00",
+            "end": "2026-07-29T13:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ],
+        "replacementSchedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000452",
+            "title": "活动任务",
+            "start": "2026-07-29T12:00:00+08:00",
+            "end": "2026-07-29T13:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000453",
+            "title": "新增任务",
+            "start": "2026-07-29T13:00:00+08:00",
+            "end": "2026-07-29T14:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 2
+          }
+        ]
+      },
+      "expected": {
+        "history": [
+          {
+            "id": "00000000-0000-0000-0000-000000000451",
+            "status": "completed",
+            "completedAt": "2026-07-29T12:00:00+08:00"
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000452",
+            "status": "active",
+            "completedAt": null
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000453",
+            "status": "active",
+            "completedAt": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "relative-future-date-becomes-exact-date",
+      "input": {
+        "action": "addRelativeFuture",
+        "now": "2026-07-29T08:00:00+08:00",
+        "daysFromToday": 2,
+        "futureTodo": {
+          "id": "00000000-0000-0000-0000-000000000461",
+          "title": "两天后事项",
+          "scheduledDate": "2026-07-31",
+          "isMandatory": false
+        }
+      },
+      "expected": {
+        "savedDate": "2026-07-31"
+      }
+    }
+  ]
+}

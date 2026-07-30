@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "operation": "selectCurrent",
+  "cases": [
+    {
+      "id": "inclusive-start",
+      "input": {
+        "now": "2026-07-29T09:00:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "title": "任务 A",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": { "currentTodoId": "00000000-0000-0000-0000-000000000001" }
+    },
+    {
+      "id": "exclusive-end",
+      "input": {
+        "now": "2026-07-29T10:00:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "title": "任务 A",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": { "currentTodoId": null }
+    },
+    {
+      "id": "cross-midnight",
+      "input": {
+        "now": "2026-07-30T00:15:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000002",
+            "title": "跨日任务",
+            "start": "2026-07-29T23:45:00+08:00",
+            "end": "2026-07-30T00:30:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ]
+      },
+      "expected": { "currentTodoId": "00000000-0000-0000-0000-000000000002" }
+    },
+    {
+      "id": "latest-conflict-priority",
+      "input": {
+        "now": "2026-07-29T09:30:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000011",
+            "title": "先录入",
+            "start": "2026-07-29T09:00:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 1
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000012",
+            "title": "后录入",
+            "start": "2026-07-29T09:15:00+08:00",
+            "end": "2026-07-29T10:15:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 2
+          }
+        ]
+      },
+      "expected": { "currentTodoId": "00000000-0000-0000-0000-000000000012" }
+    },
+    {
+      "id": "touching-boundary-selects-next",
+      "input": {
+        "now": "2026-07-29T11:00:00+08:00",
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000021",
+            "title": "前一事项",
+            "start": "2026-07-29T10:00:00+08:00",
+            "end": "2026-07-29T11:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000022",
+            "title": "后一事项",
+            "start": "2026-07-29T11:00:00+08:00",
+            "end": "2026-07-29T12:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ]
+      },
+      "expected": { "currentTodoId": "00000000-0000-0000-0000-000000000022" }
+    }
+  ]
+}

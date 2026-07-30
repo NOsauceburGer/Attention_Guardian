@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AttentionGuardian.Desktop.Controls.GlassNumberStepper"
+             x:Name="Stepper"
+             MinWidth="112"
+    MinHeight="44">
+    <UserControl.Styles>
+        <Style Selector="Border.StepperShell">
+            <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform"
+                                                   Duration="0:0:0.18" />
+                    <BrushTransition Property="BorderBrush"
+                                     Duration="0:0:0.18" />
+                    <BoxShadowsTransition Property="BoxShadow"
+                                          Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="UserControl:focus-within Border.StepperShell">
+            <Setter Property="BorderBrush" Value="#B85AA7F5" />
+            <Setter Property="BoxShadow" Value="0 6 8 0 #38205072" />
+            <Setter Property="RenderTransform" Value="scale(1.012) translateY(-1px)" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <Style Selector="TextBox:pointerover">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox:focus">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="RenderTransform" Value="none" />
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_Border">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </UserControl.Styles>
+    <Grid>
+        <Border Classes="StepperShell"
+                BorderBrush="#42E5F5FF"
+                BorderThickness="1"
+                CornerRadius="22"
+                BoxShadow="0 4 8 0 #24070D12">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                    <GradientStop Color="#303C6074" Offset="0" />
+                    <GradientStop Color="#332A3B48" Offset="0.38" />
+                    <GradientStop Color="#3826333F" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <Grid ColumnDefinitions="40,*,40">
+                <Button Click="Decrease"
+                        Content="−"
+                        Padding="0"
+                        MinWidth="40"
+                        MinHeight="42"
+                        CornerRadius="21"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="21"
+                        FontWeight="Normal"
+                        AutomationProperties.Name="{Binding DecreaseLabel, ElementName=Stepper}" />
+                <TextBox x:Name="ValueText"
+                         Grid.Column="1"
+                         MinHeight="42"
+                         Padding="0"
+                         TextAlignment="Center"
+                         HorizontalContentAlignment="Center"
+                         VerticalContentAlignment="Center"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         FontSize="17"
+                         FontWeight="Medium"
+                         AutomationProperties.Name="{Binding Label, ElementName=Stepper}"
+                         LostFocus="CommitText"
+                         KeyDown="ValueTextKeyDown" />
+                <Button Grid.Column="2"
+                        Click="Increase"
+                        Content="+"
+                        Padding="0"
+                        MinWidth="40"
+                        MinHeight="42"
+                        CornerRadius="21"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="21"
+                        FontWeight="Normal"
+                        AutomationProperties.Name="{Binding IncreaseLabel, ElementName=Stepper}" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

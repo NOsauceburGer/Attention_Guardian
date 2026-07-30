@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "operation": "insertSchedule",
+  "cases": [
+    {
+      "id": "cascade-stops-at-gap",
+      "input": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000103",
+            "title": "有空档",
+            "start": "2026-07-29T11:00:00+08:00",
+            "end": "2026-07-29T11:30:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000102",
+            "title": "被顺延",
+            "start": "2026-07-29T09:30:00+08:00",
+            "end": "2026-07-29T10:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ],
+        "proposedTodo": {
+          "id": "00000000-0000-0000-0000-000000000101",
+          "title": "新任务",
+          "start": "2026-07-29T09:15:00+08:00",
+          "end": "2026-07-29T09:45:00+08:00",
+          "isMandatory": false,
+          "currentSelectionPriority": 1
+        }
+      },
+      "expected": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000101",
+            "title": "新任务",
+            "start": "2026-07-29T09:15:00+08:00",
+            "end": "2026-07-29T09:45:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000102",
+            "title": "被顺延",
+            "start": "2026-07-29T09:45:00+08:00",
+            "end": "2026-07-29T10:15:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000103",
+            "title": "有空档",
+            "start": "2026-07-29T11:00:00+08:00",
+            "end": "2026-07-29T11:30:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          }
+        ],
+        "hasRolloverToNextDay": false,
+        "conflicts": []
+      }
+    },
+    {
+      "id": "skip-multiple-mandatory-and-rollover",
+      "input": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000112",
+            "title": "挡板二",
+            "start": "2026-07-30T00:00:00+08:00",
+            "end": "2026-07-30T00:20:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000111",
+            "title": "挡板一",
+            "start": "2026-07-29T23:40:00+08:00",
+            "end": "2026-07-30T00:00:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 0
+          }
+        ],
+        "proposedTodo": {
+          "id": "00000000-0000-0000-0000-000000000113",
+          "title": "跨日普通任务",
+          "start": "2026-07-29T23:30:00+08:00",
+          "end": "2026-07-30T00:00:00+08:00",
+          "isMandatory": false,
+          "currentSelectionPriority": 1
+        }
+      },
+      "expected": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000111",
+            "title": "挡板一",
+            "start": "2026-07-29T23:40:00+08:00",
+            "end": "2026-07-30T00:00:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000112",
+            "title": "挡板二",
+            "start": "2026-07-30T00:00:00+08:00",
+            "end": "2026-07-30T00:20:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000113",
+            "title": "跨日普通任务",
+            "start": "2026-07-30T00:20:00+08:00",
+            "end": "2026-07-30T00:50:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ],
+        "hasRolloverToNextDay": true,
+        "conflicts": []
+      }
+    },
+    {
+      "id": "mandatory-overlap-is-saved",
+      "input": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000121",
+            "title": "已有不可移动",
+            "start": "2026-07-29T14:00:00+08:00",
+            "end": "2026-07-29T15:00:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 1
+          }
+        ],
+        "proposedTodo": {
+          "id": "00000000-0000-0000-0000-000000000122",
+          "title": "新增不可移动",
+          "start": "2026-07-29T14:30:00+08:00",
+          "end": "2026-07-29T15:30:00+08:00",
+          "isMandatory": true,
+          "currentSelectionPriority": 2
+        }
+      },
+      "expected": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000121",
+            "title": "已有不可移动",
+            "start": "2026-07-29T14:00:00+08:00",
+            "end": "2026-07-29T15:00:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 1
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000122",
+            "title": "新增不可移动",
+            "start": "2026-07-29T14:30:00+08:00",
+            "end": "2026-07-29T15:30:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 2
+          }
+        ],
+        "hasRolloverToNextDay": false,
+        "conflicts": [
+          {
+            "proposedTodoId": "00000000-0000-0000-0000-000000000122",
+            "mandatoryTodoId": "00000000-0000-0000-0000-000000000121"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cascade-across-two-normal-todos",
+      "input": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000131",
+            "title": "普通 A",
+            "start": "2026-07-29T20:00:00+08:00",
+            "end": "2026-07-29T20:30:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000132",
+            "title": "普通 B",
+            "start": "2026-07-29T20:30:00+08:00",
+            "end": "2026-07-29T21:00:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ],
+        "proposedTodo": {
+          "id": "00000000-0000-0000-0000-000000000133",
+          "title": "插入任务",
+          "start": "2026-07-29T20:00:00+08:00",
+          "end": "2026-07-29T20:45:00+08:00",
+          "isMandatory": false,
+          "currentSelectionPriority": 2
+        }
+      },
+      "expected": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000133",
+            "title": "插入任务",
+            "start": "2026-07-29T20:00:00+08:00",
+            "end": "2026-07-29T20:45:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 2
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000131",
+            "title": "普通 A",
+            "start": "2026-07-29T20:45:00+08:00",
+            "end": "2026-07-29T21:15:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000132",
+            "title": "普通 B",
+            "start": "2026-07-29T21:15:00+08:00",
+            "end": "2026-07-29T21:45:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ],
+        "hasRolloverToNextDay": false,
+        "conflicts": []
+      }
+    },
+    {
+      "id": "skip-one-mandatory-preserves-duration",
+      "input": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000141",
+            "title": "单个挡板",
+            "start": "2026-07-29T22:15:00+08:00",
+            "end": "2026-07-29T22:45:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 0
+          }
+        ],
+        "proposedTodo": {
+          "id": "00000000-0000-0000-0000-000000000142",
+          "title": "普通任务",
+          "start": "2026-07-29T22:00:00+08:00",
+          "end": "2026-07-29T22:30:00+08:00",
+          "isMandatory": false,
+          "currentSelectionPriority": 1
+        }
+      },
+      "expected": {
+        "schedule": [
+          {
+            "id": "00000000-0000-0000-0000-000000000141",
+            "title": "单个挡板",
+            "start": "2026-07-29T22:15:00+08:00",
+            "end": "2026-07-29T22:45:00+08:00",
+            "isMandatory": true,
+            "currentSelectionPriority": 0
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000142",
+            "title": "普通任务",
+            "start": "2026-07-29T22:45:00+08:00",
+            "end": "2026-07-29T23:15:00+08:00",
+            "isMandatory": false,
+            "currentSelectionPriority": 1
+          }
+        ],
+        "hasRolloverToNextDay": false,
+        "conflicts": []
+      }
+    }
+  ]
+}
