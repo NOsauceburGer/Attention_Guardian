@@ -39,6 +39,46 @@ public struct ManagementFutureItem: Identifiable, Equatable, Sendable {
     public var dateText: String { record.todo.scheduledDate.description }
 }
 
+public struct ManagementScheduledEditDraft: Equatable, Sendable {
+    public let id: UUID
+    public var title: String
+    public var hour: Int
+    public var minute: Int
+    public var durationHours: Int
+    public var durationMinutes: Int
+    public var isMandatory: Bool
+
+    public init(item: ManagementScheduledItem) {
+        let todo = item.todo
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(
+            secondsFromGMT: todo.utcOffsetSeconds)
+            ?? TimeZone(secondsFromGMT: 0)!
+        let components = calendar.dateComponents(
+            [.hour, .minute],
+            from: todo.start)
+        id = todo.id
+        title = todo.title
+        hour = components.hour ?? 0
+        minute = components.minute ?? 0
+        let totalMinutes = Int(todo.duration / 60)
+        durationHours = totalMinutes / 60
+        durationMinutes = totalMinutes % 60
+        isMandatory = todo.isMandatory
+    }
+
+    public var isValid: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && durationHours * 60 + durationMinutes > 0
+    }
+}
+
+public enum ManagementScheduledEditOutcome: Equatable, Sendable {
+    case saved
+    case conflictResolutionRequired(conflictingTitle: String)
+    case mandatoryStartRejected(conflictingTitle: String)
+}
+
 public struct ManagementSurface: View {
     @Environment(\.horizontalSizeClass)
     private var horizontalSizeClass
@@ -49,6 +89,10 @@ public struct ManagementSurface: View {
     private let futureItems: [ManagementFutureItem]?
     private let isLoading: Bool
     private let onLoadFutureTodos: () async -> Void
+    private let onSaveScheduled: (
+        ManagementScheduledEditDraft,
+        StartTimeConflictResolution?
+    ) async throws -> ManagementScheduledEditOutcome
     private let onDeleteScheduled: (UUID) async throws -> Void
     private let onDeleteFuture: (UUID) async throws -> Void
     private let onBack: () -> Void
@@ -56,6 +100,11 @@ public struct ManagementSurface: View {
     @State private var displayState = ManagementDisplayState()
     @State private var isFutureExpanded = false
     @State private var deletion: DeletionRequest?
+    @State private var editDraft: ManagementScheduledEditDraft?
+    @State private var pendingConflictTitle: String?
+    @State private var isLeavingWithEdit = false
+    @State private var shouldLeaveAfterSave = false
+    @State private var isSavingEdit = false
     @State private var errorMessage: String?
 
     public init(
@@ -63,6 +112,10 @@ public struct ManagementSurface: View {
         futureItems: [ManagementFutureItem]?,
         isLoading: Bool,
         onLoadFutureTodos: @escaping () async -> Void,
+        onSaveScheduled: @escaping (
+            ManagementScheduledEditDraft,
+            StartTimeConflictResolution?
+        ) async throws -> ManagementScheduledEditOutcome,
         onDeleteScheduled: @escaping (UUID) async throws -> Void,
         onDeleteFuture: @escaping (UUID) async throws -> Void,
         onBack: @escaping () -> Void
@@ -71,6 +124,7 @@ public struct ManagementSurface: View {
         self.futureItems = futureItems
         self.isLoading = isLoading
         self.onLoadFutureTodos = onLoadFutureTodos
+        self.onSaveScheduled = onSaveScheduled
         self.onDeleteScheduled = onDeleteScheduled
         self.onDeleteFuture = onDeleteFuture
         self.onBack = onBack
@@ -109,6 +163,54 @@ public struct ManagementSurface: View {
             }
         } message: {
             Text("删除后，这条事项将退出活动列表。")
+        }
+        .confirmationDialog(
+            pendingConflictTitle.map {
+                "开始时间与“\($0)”重叠"
+            } ?? "",
+            isPresented: Binding(
+                get: { pendingConflictTitle != nil },
+                set: { if !$0 { pendingConflictTitle = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("原事件移到此事件之后") {
+                pendingConflictTitle = nil
+                Task {
+                    await saveEdit(
+                        resolution: .moveExistingAfterEdited)
+                }
+            }
+            Button("原事件在此时间结束") {
+                pendingConflictTitle = nil
+                Task {
+                    await saveEdit(
+                        resolution: .truncateExistingAtNewStart)
+                }
+            }
+            Button("取消", role: .cancel) {
+                pendingConflictTitle = nil
+                shouldLeaveAfterSave = false
+            }
+        } message: {
+            Text("请选择如何处理正在这个时刻执行的普通事件。")
+        }
+        .confirmationDialog(
+            "还有未收起的修改",
+            isPresented: $isLeavingWithEdit,
+            titleVisibility: .visible
+        ) {
+            Button("保存并离开") {
+                shouldLeaveAfterSave = true
+                Task { await saveEdit(resolution: nil) }
+            }
+            Button("不保存并离开", role: .destructive) {
+                editDraft = nil
+                shouldLeaveAfterSave = false
+                onBack()
+            }
+            Button("继续编辑", role: .cancel) {}
+        } message: {
+            Text("你可以保存修改、不保存离开，或返回继续编辑。")
         }
         .alert(
             "暂时无法完成操作",
@@ -166,7 +268,7 @@ public struct ManagementSurface: View {
     }
 
     private var backButton: some View {
-        Button("返回专注", action: onBack)
+        Button("返回专注", action: requestBack)
             .buttonStyle(GlassCapsuleButtonStyle())
     }
 
@@ -194,7 +296,32 @@ public struct ManagementSurface: View {
         _ item: ManagementScheduledItem
     ) -> some View {
         GlassSurface {
-            HStack(spacing: AGSpace.component) {
+            VStack(spacing: AGSpace.component) {
+                scheduledSummary(item)
+                    .onTapGesture(count: 2) {
+                        toggleEdit(item)
+                    }
+
+                if editDraft?.id == item.id {
+                    scheduledEditor(item)
+                        .transition(.opacity)
+                }
+            }
+            .padding(AGSpace.component)
+        }
+        .accessibilityAction(
+            named: editDraft?.id == item.id
+                ? "收起并保存编辑" : "展开编辑"
+        ) {
+            toggleEdit(item)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func scheduledSummary(
+        _ item: ManagementScheduledItem
+    ) -> some View {
+        HStack(spacing: AGSpace.component) {
                 if item.isMandatory {
                     Image(systemName: "lock.fill")
                         .foregroundStyle(AGColor.mandatory)
@@ -223,10 +350,99 @@ public struct ManagementSurface: View {
                         kind: .scheduled)
                 }
                 .buttonStyle(.plain)
-            }
-            .padding(AGSpace.component)
         }
-        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func scheduledEditor(
+        _ item: ManagementScheduledItem
+    ) -> some View {
+        if let binding = editDraftBinding(for: item.id) {
+            VStack(alignment: .leading, spacing: AGSpace.component) {
+                editorField("名称") {
+                    TextField("要做什么？", text: binding.title)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, AGSpace.component)
+                        .frame(minHeight: AGLayout.minimumTouchTarget)
+                        .background(.thinMaterial, in: RoundedRectangle(
+                            cornerRadius: AGLayout.componentCornerRadius,
+                            style: .continuous))
+                        .disabled(item.isBreak)
+                }
+
+                editorField("开始时间") {
+                    HStack(spacing: AGSpace.related) {
+                        GlassPicker(
+                            selection: binding.hour,
+                            values: Array(0...23)
+                        ) {
+                            Text(String(format: "%02d", $0))
+                        }
+                        Text(":")
+                        GlassPicker(
+                            selection: binding.minute,
+                            values: Array(0...59)
+                        ) {
+                            Text(String(format: "%02d", $0))
+                        }
+                    }
+                }
+
+                editorField("持续时间") {
+                    ViewThatFits {
+                        HStack(spacing: AGSpace.component) {
+                            durationEditor(binding)
+                        }
+                        VStack(spacing: AGSpace.related) {
+                            durationEditor(binding)
+                        }
+                    }
+                }
+
+                Toggle(
+                    "不可移动事件",
+                    isOn: binding.isMandatory)
+                    .toggleStyle(.switch)
+
+                Text("再次双击气泡会统一试算并保存")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if isSavingEdit {
+                    ProgressView()
+                        .accessibilityLabel("正在保存修改")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func durationEditor(
+        _ binding: Binding<ManagementScheduledEditDraft>
+    ) -> some View {
+        LabeledContent("小时") {
+            GlassNumberStepper(
+                "小时",
+                value: binding.durationHours,
+                in: 0...23)
+        }
+        LabeledContent("分钟") {
+            GlassNumberStepper(
+                "分钟",
+                value: binding.durationMinutes,
+                in: 0...59)
+        }
+    }
+
+    private func editorField<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: AGSpace.compact) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            content()
+        }
     }
 
     private var futureSection: some View {
@@ -306,6 +522,64 @@ public struct ManagementSurface: View {
         } catch {
             errorMessage = "本地事项没有改变，请稍后重试。"
         }
+    }
+
+    private func toggleEdit(_ item: ManagementScheduledItem) {
+        guard !isSavingEdit else { return }
+        if editDraft?.id == item.id {
+            Task { await saveEdit(resolution: nil) }
+        } else if editDraft == nil {
+            editDraft = ManagementScheduledEditDraft(item: item)
+        } else {
+            errorMessage = "请先收起正在编辑的事项。"
+        }
+    }
+
+    private func saveEdit(
+        resolution: StartTimeConflictResolution?
+    ) async {
+        guard let draft = editDraft, draft.isValid else {
+            errorMessage = "名称不能为空，持续时间必须大于零。"
+            shouldLeaveAfterSave = false
+            return
+        }
+        isSavingEdit = true
+        defer { isSavingEdit = false }
+        do {
+            switch try await onSaveScheduled(draft, resolution) {
+            case .saved:
+                editDraft = nil
+                if shouldLeaveAfterSave {
+                    shouldLeaveAfterSave = false
+                    onBack()
+                }
+            case let .conflictResolutionRequired(title):
+                pendingConflictTitle = title
+            case let .mandatoryStartRejected(title):
+                shouldLeaveAfterSave = false
+                errorMessage = "“\(title)”是不可移动事件，这个开始时间无法使用。"
+            }
+        } catch {
+            shouldLeaveAfterSave = false
+            errorMessage = "本地事项没有改变，请稍后重试。"
+        }
+    }
+
+    private func requestBack() {
+        if editDraft == nil {
+            onBack()
+        } else {
+            isLeavingWithEdit = true
+        }
+    }
+
+    private func editDraftBinding(
+        for id: UUID
+    ) -> Binding<ManagementScheduledEditDraft>? {
+        guard editDraft?.id == id else { return nil }
+        return Binding(
+            get: { editDraft! },
+            set: { editDraft = $0 })
     }
 
     private var horizontalInset: CGFloat {

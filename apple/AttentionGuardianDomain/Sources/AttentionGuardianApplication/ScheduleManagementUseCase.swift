@@ -51,6 +51,33 @@ public struct ScheduleManagementUseCase: Sendable {
         return schedule
     }
 
+    public func edit(
+        todoId: UUID,
+        title: String,
+        duration: TimeInterval,
+        isMandatory: Bool,
+        newStart: Date,
+        conflictResolution: StartTimeConflictResolution?
+    ) async throws -> ScheduleStartEditResult {
+        let context = try await loadContext()
+        let edited = try ScheduleManagement.edit(
+            context.active,
+            todoId: todoId,
+            title: title,
+            duration: duration,
+            isMandatory: isMandatory)
+        let result = try ScheduleManagement.editStart(
+            edited,
+            todoId: todoId,
+            newStart: newStart,
+            conflictResolution: conflictResolution)
+        guard result.rejection == .none else {
+            return result
+        }
+        try await persist(result.scheduledTodos, over: context.records)
+        return result
+    }
+
     public func delete(todoId: UUID) async throws -> [ScheduledTodo] {
         let context = try await loadContext()
         let schedule = try ScheduleManagement.delete(

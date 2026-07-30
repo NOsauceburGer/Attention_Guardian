@@ -104,6 +104,57 @@ struct ScheduleManagementUseCaseTests {
     }
 
     @Test
+    func combinedEditWaitsForConflictChoiceBeforeWriting() async throws {
+        let now = Date(timeIntervalSince1970: 1_775_315_000)
+        let existing = try item(
+            "00000000-0000-0000-0000-000000000815",
+            "原事件", now, 1_800)
+        let moving = try item(
+            "00000000-0000-0000-0000-000000000816",
+            "待修改", existing.end, 1_800)
+        let repository = ScheduledTodoRepositoryFake(records: [
+            ScheduledTodoRecord(todo: existing),
+            ScheduledTodoRecord(todo: moving)
+        ])
+        let service = ScheduleManagementUseCase(
+            repository: repository,
+            clock: FixedClock(now: now.addingTimeInterval(-60)))
+        let newStart = now.addingTimeInterval(600)
+
+        let waiting = try await service.edit(
+            todoId: moving.id,
+            title: "已修改",
+            duration: 2_400,
+            isMandatory: true,
+            newStart: newStart,
+            conflictResolution: nil)
+
+        #expect(waiting.rejection == .conflictResolutionRequired)
+        #expect(waiting.conflictingTodoId == existing.id)
+        #expect(repository.replacements.isEmpty)
+
+        let saved = try await service.edit(
+            todoId: moving.id,
+            title: "已修改",
+            duration: 2_400,
+            isMandatory: true,
+            newStart: newStart,
+            conflictResolution: .moveExistingAfterEdited)
+
+        #expect(saved.rejection == .none)
+        #expect(repository.replacements.count == 1)
+        #expect(repository.records.first {
+            $0.todo.id == moving.id
+        }?.todo.title == "已修改")
+        #expect(repository.records.first {
+            $0.todo.id == moving.id
+        }?.todo.start == newStart)
+        #expect(repository.records.first {
+            $0.todo.id == moving.id
+        }?.todo.isMandatory == true)
+    }
+
+    @Test
     func loadEditInsertBreakAndDeletePreserveLifecycleRecords() async throws {
         let now = Date(timeIntervalSince1970: 1_775_320_000)
         let original = try item(

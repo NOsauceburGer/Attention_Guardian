@@ -42,4 +42,26 @@ struct AdaptiveLayoutTests {
         #expect(item.title == "专注")
         #expect(item.isMandatory == false)
     }
+
+    @Test("scheduled edit draft starts from the persisted todo")
+    func scheduledEditDraftUsesPersistedValues() throws {
+        let start = Date(timeIntervalSince1970: 1_775_400_000)
+        let todo = try ScheduledTodo(
+            id: #require(UUID(uuidString:
+                "00000000-0000-0000-0000-000000000902")),
+            title: "准备材料",
+            start: start,
+            end: start.addingTimeInterval(5_400),
+            utcOffsetSeconds: 28_800,
+            isMandatory: true)
+
+        let draft = ManagementScheduledEditDraft(
+            item: ManagementScheduledItem(todo: todo))
+
+        #expect(draft.title == "准备材料")
+        #expect(draft.durationHours == 1)
+        #expect(draft.durationMinutes == 30)
+        #expect(draft.isMandatory)
+        #expect(draft.isValid)
+    }
 }

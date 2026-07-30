@@ -135,6 +135,69 @@ final class MacAppModel: ObservableObject {
         try await refreshOpeningState()
     }
 
+    func saveManagedScheduledTodo(
+        _ draft: ManagementScheduledEditDraft,
+        conflictResolution: StartTimeConflictResolution?
+    ) async throws -> ManagementScheduledEditOutcome {
+        guard let persistence else { throw MacAppError.persistenceUnavailable }
+        guard let original = managedScheduledItems.first(
+            where: { $0.id == draft.id })?.todo
+        else {
+            throw MacAppError.todoUnavailable
+        }
+
+        let clock = SystemClock()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = clock.timeZone
+        let components = calendar.dateComponents(
+            [.year, .month, .day],
+            from: original.start)
+        guard let year = components.year,
+              let month = components.month,
+              let day = components.day else {
+            throw MacAppError.invalidLocalTime
+        }
+        let local = String(
+            format: "%04d-%02d-%02dT%02d:%02d:00",
+            year, month, day, draft.hour, draft.minute)
+        let resolution = try LocalDateTimeResolver.resolve(
+            local,
+            timeZoneId: clock.timeZone.identifier)
+        guard case let .resolved(newStart, _) = resolution else {
+            throw MacAppError.invalidLocalTime
+        }
+
+        let result = try await ScheduleManagementUseCase(
+            repository: persistence.scheduledTodos,
+            clock: clock)
+            .edit(
+                todoId: draft.id,
+                title: draft.title,
+                duration: TimeInterval(
+                    draft.durationHours * 3_600
+                    + draft.durationMinutes * 60),
+                isMandatory: draft.isMandatory,
+                newStart: newStart,
+                conflictResolution: conflictResolution)
+
+        let conflictingTitle = result.conflictingTodoId.flatMap { id in
+            managedScheduledItems.first { $0.id == id }?.title
+        } ?? "另一事项"
+        switch result.rejection {
+        case .none:
+            managedScheduledItems = result.scheduledTodos.map(
+                ManagementScheduledItem.init)
+            try await refreshOpeningState()
+            return .saved
+        case .conflictResolutionRequired:
+            return .conflictResolutionRequired(
+                conflictingTitle: conflictingTitle)
+        case .mandatoryTodoOccupiesNewStart:
+            return .mandatoryStartRejected(
+                conflictingTitle: conflictingTitle)
+        }
+    }
+
     func deleteManagedFutureTodo(_ id: UUID) async throws {
         guard let persistence else { throw MacAppError.persistenceUnavailable }
         let records = try await FutureTodoManagementUseCase(
@@ -161,5 +224,6 @@ final class MacAppModel: ObservableObject {
 private enum MacAppError: Error {
     case persistenceUnavailable
     case invalidLocalTime
+    case todoUnavailable
 }
 #endif

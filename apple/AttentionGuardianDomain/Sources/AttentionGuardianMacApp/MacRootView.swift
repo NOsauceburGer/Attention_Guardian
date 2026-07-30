@@ -24,6 +24,7 @@ struct MacRootView: View {
                     futureItems: model.managedFutureItems,
                     isLoading: model.isManagementLoading,
                     onLoadFutureTodos: model.loadManagedFutureTodos,
+                    onSaveScheduled: model.saveManagedScheduledTodo,
                     onDeleteScheduled: model.deleteManagedScheduledTodo,
                     onDeleteFuture: model.deleteManagedFutureTodo,
                     onBack: { model.destination = .focus })
