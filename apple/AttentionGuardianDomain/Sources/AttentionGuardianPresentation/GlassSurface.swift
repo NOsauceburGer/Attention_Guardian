@@ -45,14 +45,18 @@ public struct GlassCapsuleButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion)
     private var reduceMotion
 
-    public init() {}
+    private let height: CGFloat
+
+    public init(height: CGFloat = AGLayout.minimumTouchTarget) {
+        self.height = height
+    }
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
             .foregroundStyle(.primary)
             .padding(.horizontal, AGSpace.section)
-            .frame(minHeight: AGLayout.minimumTouchTarget)
+            .frame(height: height)
             .background(.thinMaterial, in: Capsule())
             .overlay {
                 Capsule().strokeBorder(

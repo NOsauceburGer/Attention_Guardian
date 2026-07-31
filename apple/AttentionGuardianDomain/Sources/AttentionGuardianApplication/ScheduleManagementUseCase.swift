@@ -151,6 +151,47 @@ public struct ScheduleManagementUseCase: Sendable {
         return result
     }
 
+    public func insertBreak(
+        id: UUID,
+        beforeTodoId: UUID?,
+        duration: TimeInterval
+    ) async throws -> ScheduleTrialResult {
+        let context = try await loadContext()
+        let target: ScheduledTodo?
+        if let beforeTodoId {
+            guard let matched = context.active.first(where: {
+                $0.id == beforeTodoId
+            }) else {
+                throw ScheduleManagementError.todoNotFound
+            }
+            target = matched
+        } else {
+            target = context.active.max {
+                if $0.end != $1.end { return $0.end < $1.end }
+                return $0.id.uuidString.lowercased()
+                    < $1.id.uuidString.lowercased()
+            }
+        }
+        let start = beforeTodoId == nil
+            ? (target?.end ?? clock.now)
+            : target!.start
+        let utcOffsetSeconds = target?.utcOffsetSeconds
+            ?? clock.timeZone.secondsFromGMT(for: start)
+        let maximum = context.active.map(\.currentSelectionPriority).max()
+        guard maximum != Int64.max else {
+            throw AddScheduledTodoError.currentSelectionPriorityOverflow
+        }
+        let result = try ScheduleManagement.insertBreak(
+            into: context.active,
+            id: id,
+            start: start,
+            duration: duration,
+            utcOffsetSeconds: utcOffsetSeconds,
+            currentSelectionPriority: maximum.map { $0 + 1 } ?? 0)
+        try await persist(result.scheduledTodos, over: context.records)
+        return result
+    }
+
     public func editStart(
         todoId: UUID,
         newStart: Date,

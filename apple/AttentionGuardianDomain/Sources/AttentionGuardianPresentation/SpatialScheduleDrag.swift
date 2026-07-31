@@ -290,9 +290,6 @@ public enum SpatialDropResolver {
 }
 
 struct LensCoreBubble: View {
-    @Environment(\.accessibilityReduceTransparency)
-    private var reduceTransparency
-
     let width: CGFloat
     let height: CGFloat
     let morphProgress: CGFloat
@@ -304,16 +301,12 @@ struct LensCoreBubble: View {
             cornerRadius: cornerRadius,
             style: .continuous)
 
-        shape
-            .fill(reduceTransparency
-                ? AnyShapeStyle(AGColor.ambientMiddle)
-                : AnyShapeStyle(.thinMaterial))
+        LiquidGlassSurface(shape: shape)
             .overlay {
                 shape.fill(RadialGradient(
                     colors: [
-                        .white.opacity(0.12 * morphProgress),
-                        AGColor.mist.opacity(0.05 * morphProgress),
-                        AGColor.ambientDeep.opacity(0.08 * morphProgress),
+                        .white.opacity(0.07 * morphProgress),
+                        AGColor.mist.opacity(0.025 * morphProgress),
                         .clear
                     ],
                     center: UnitPoint(x: 0.43, y: 0.39),
@@ -322,15 +315,22 @@ struct LensCoreBubble: View {
             }
             .overlay {
                 shape.strokeBorder(
-                    .white.opacity(isMagnetized ? 0.3 : 0.22),
-                    lineWidth: isMagnetized ? 1 : 0.75)
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(isMagnetized ? 0.62 : 0.52),
+                            .white.opacity(0.08),
+                            .white.opacity(0.30)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing),
+                    lineWidth: isMagnetized ? 1.05 : 0.8)
             }
             .overlay(alignment: .topLeading) {
                 Ellipse()
                     .trim(from: 0.08, to: 0.46)
                     .stroke(
-                        .white.opacity(0.22 * morphProgress),
-                        lineWidth: 0.8)
+                        .white.opacity(0.32 * morphProgress),
+                        lineWidth: 0.9)
                     .frame(
                         width: width * 0.56,
                         height: height * 0.31)
@@ -341,9 +341,9 @@ struct LensCoreBubble: View {
             }
             .shadow(
                 color: AGColor.ambientDeep.opacity(
-                    0.16 + 0.06 * morphProgress),
-                radius: 8 + 5 * morphProgress,
-                y: 3 + 5 * morphProgress)
+                    0.10 + 0.03 * morphProgress),
+                radius: 7 + 4 * morphProgress,
+                y: 2 + 4 * morphProgress)
             .accessibilityHidden(true)
     }
 }

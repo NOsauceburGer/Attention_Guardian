@@ -260,6 +260,48 @@ struct ScheduleManagementUseCaseTests {
         }?.status == .active)
     }
 
+    @Test
+    func breakTemplateCanInsertBeforeATodoAndThenAppendAgain() async throws {
+        let now = Date(timeIntervalSince1970: 1_775_325_000)
+        let first = try item(
+            "00000000-0000-0000-0000-000000000823",
+            "第一", now, 1_800)
+        let second = try item(
+            "00000000-0000-0000-0000-000000000824",
+            "第二", first.end, 1_800)
+        let repository = ScheduledTodoRepositoryFake(records: [
+            ScheduledTodoRecord(todo: first),
+            ScheduledTodoRecord(todo: second)
+        ])
+        let service = ScheduleManagementUseCase(
+            repository: repository,
+            clock: FixedClock(now: now.addingTimeInterval(-60)))
+        let firstBreakId = try #require(UUID(uuidString:
+            "00000000-0000-0000-0000-000000000825"))
+        let secondBreakId = try #require(UUID(uuidString:
+            "00000000-0000-0000-0000-000000000826"))
+
+        let inserted = try await service.insertBreak(
+            id: firstBreakId,
+            beforeTodoId: second.id,
+            duration: 1_200)
+        #expect(inserted.scheduledTodos.map(\.id) == [
+            first.id, firstBreakId, second.id
+        ])
+
+        let appended = try await service.insertBreak(
+            id: secondBreakId,
+            beforeTodoId: nil,
+            duration: 1_200)
+        #expect(appended.scheduledTodos.map(\.id) == [
+            first.id, firstBreakId, second.id, secondBreakId
+        ])
+        #expect(appended.scheduledTodos.filter {
+            $0.title == ScheduleManagement.breakTitle
+        }.map(\.duration) == [1_200, 1_200])
+        #expect(repository.replacements.count == 2)
+    }
+
     private func item(
         _ id: String, _ title: String, _ start: Date, _ duration: TimeInterval
     ) throws -> ScheduledTodo {

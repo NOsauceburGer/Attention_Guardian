@@ -24,6 +24,9 @@ struct AdaptiveLayoutTests {
     @Test("touch targets follow Apple minimum")
     func minimumTouchTarget() {
         #expect(AGLayout.minimumTouchTarget >= 44)
+        #expect(
+            AGLayout.managementCapsuleHeight
+                >= AGLayout.minimumTouchTarget)
     }
 
     @Test("management display state hides start times by default")
@@ -41,6 +44,80 @@ struct AdaptiveLayoutTests {
         #expect(state.startTimeToggleTitle == "显示开始时间")
         #expect(item.title == "专注")
         #expect(item.isMandatory == false)
+    }
+
+    @Test("break template defaults to a reusable twenty minute rest")
+    func breakTemplateDefaults() {
+        let draft = ManagementBreakTemplateDraft()
+
+        #expect(draft.title == "休息")
+        #expect(draft.durationMinutes == 20)
+        #expect(draft.duration == 1_200)
+        #expect(draft.isValid)
+    }
+
+    @Test("break time entity reveals its stepper only after morphing")
+    func breakTimeEntityStagesExpansionContent() {
+        var state = BreakTimeEntityState()
+
+        #expect(state.showsCup)
+        #expect(state.showsStepper == false)
+
+        state.beginExpansion()
+        #expect(state.isExpanded)
+        #expect(state.showsCup == false)
+        #expect(state.showsStepper == false)
+
+        state.completeExpansion()
+        #expect(state.showsCup == false)
+        #expect(state.showsStepper)
+
+        state.durationMinutes = 35
+        state.beginCollapse()
+        #expect(state.isExpanded)
+        #expect(state.showsCup == false)
+        #expect(state.showsStepper == false)
+
+        state.completeCollapse()
+        #expect(state.isExpanded == false)
+        #expect(state.showsCup)
+        #expect(state.durationMinutes == 35)
+        #expect(state.accessibilityValue == "休息，35 分钟")
+    }
+
+    @Test("break time entity remains reusable after a spatial drag")
+    func breakTimeEntityDragRemainsReusable() {
+        var state = BreakTimeEntityState()
+
+        state.beginDrag()
+        state.magnetize(targetIndex: 1)
+        state.release()
+        state.finishInsertion()
+
+        #expect(state.dragPhase == .idle)
+        #expect(state.completedInsertions == 1)
+        #expect(state.canBeginDrag)
+
+        state.beginDrag()
+        #expect(state.canBeginDrag == false)
+    }
+
+    @Test("break stepper increments and decrements symmetrically")
+    func breakStepperAdjustsSymmetrically() {
+        var state = BreakTimeEntityState()
+
+        state.adjustDuration(by: 1)
+        #expect(state.durationMinutes == 21)
+        state.adjustDuration(by: -1)
+        #expect(state.durationMinutes == 20)
+
+        state.durationMinutes = 1
+        state.adjustDuration(by: -1)
+        #expect(state.durationMinutes == 1)
+
+        state.durationMinutes = 180
+        state.adjustDuration(by: 1)
+        #expect(state.durationMinutes == 180)
     }
 
     @Test("scheduled edit draft starts from the persisted todo")

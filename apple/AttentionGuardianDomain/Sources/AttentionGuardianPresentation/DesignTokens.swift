@@ -50,6 +50,7 @@ public enum AGSpace {
 public enum AGLayout {
     public static let readableMaximum: CGFloat = 680
     public static let minimumTouchTarget: CGFloat = 44
+    public static let managementCapsuleHeight: CGFloat = 64
     public static let dashboardCornerRadius: CGFloat = 32
     public static let componentCornerRadius: CGFloat = 18
 

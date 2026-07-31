@@ -13,6 +13,20 @@ public struct ManagementDisplayState: Equatable, Sendable {
     }
 }
 
+public struct ManagementBreakTemplateDraft: Equatable, Sendable {
+    public var durationMinutes: Int
+
+    public init(durationMinutes: Int = 20) {
+        self.durationMinutes = durationMinutes
+    }
+
+    public var title: String { ScheduleManagement.breakTitle }
+    public var duration: TimeInterval {
+        TimeInterval(durationMinutes * 60)
+    }
+    public var isValid: Bool { durationMinutes > 0 }
+}
+
 public struct ManagementScheduledItem: Identifiable, Equatable, Sendable {
     public let todo: ScheduledTodo
     public let allowsMandatoryGroupDrag: Bool
@@ -160,6 +174,8 @@ public struct ManagementSurface: View {
         (UUID) async throws -> [ManagementDropPreview]
     private let onReorder:
         (UUID, Int) async throws -> ManagementReorderOutcome
+    private let onInsertBreak:
+        (ManagementBreakTemplateDraft, UUID?) async throws -> Void
     private let onDeleteScheduled: (UUID) async throws -> Void
     private let onDeleteFuture: (UUID) async throws -> Void
     private let onBack: () -> Void
@@ -184,6 +200,15 @@ public struct ManagementSurface: View {
     @State private var renderedDragTranslation = CGSize.zero
     @State private var dragMorphProgress: CGFloat = 0
     @State private var reorderNotice: String?
+    @State private var breakEntityState = BreakTimeEntityState()
+    @State private var breakOriginFrame: CGRect?
+    @State private var breakEndFrame: CGRect?
+    @State private var breakPressLocation: CGPoint?
+    @State private var breakLandingFrame: CGRect?
+    @State private var breakDragTranslation = CGSize.zero
+    @State private var breakDragMorphProgress: CGFloat = 0
+    @State private var breakDropTargetId: UUID?
+    @State private var isInsertingBreak = false
 
     public init(
         scheduledItems: [ManagementScheduledItem],
@@ -202,6 +227,10 @@ public struct ManagementSurface: View {
             UUID,
             Int
         ) async throws -> ManagementReorderOutcome,
+        onInsertBreak: @escaping (
+            ManagementBreakTemplateDraft,
+            UUID?
+        ) async throws -> Void,
         onDeleteScheduled: @escaping (UUID) async throws -> Void,
         onDeleteFuture: @escaping (UUID) async throws -> Void,
         onBack: @escaping () -> Void
@@ -214,6 +243,7 @@ public struct ManagementSurface: View {
         self.onSaveScheduled = onSaveScheduled
         self.onPreviewReorder = onPreviewReorder
         self.onReorder = onReorder
+        self.onInsertBreak = onInsertBreak
         self.onDeleteScheduled = onDeleteScheduled
         self.onDeleteFuture = onDeleteFuture
         self.onBack = onBack
@@ -227,12 +257,16 @@ public struct ManagementSurface: View {
                 ScrollView {
                     VStack(spacing: AGSpace.section) {
                         header
-                        scheduledSection
+                        managementWorkspace
                         futureSection
                     }
                     .frame(maxWidth: AGLayout.readableMaximum)
                     .padding(.horizontal, horizontalInset)
                     .padding(.vertical, AGSpace.section)
+                    .padding(
+                        .bottom,
+                        AGLayout.minimumTouchTarget
+                            + AGSpace.section * 2)
                 }
                 .onChange(of: mandatoryGroups) { _, groups in
                     guard let firstGroup = groups.first,
@@ -248,6 +282,8 @@ public struct ManagementSurface: View {
             }
 
             spatialDragOverlay
+            breakSpatialDragOverlay
+            bottomBreakEntityLayer
 
             if let reorderNotice {
                 VStack {
@@ -349,6 +385,7 @@ public struct ManagementSurface: View {
         }
         .onDisappear {
             resetSpatialDrag()
+            resetBreakSpatialDrag()
         }
     }
 
@@ -401,6 +438,19 @@ public struct ManagementSurface: View {
     }
 
     @ViewBuilder
+    private var managementWorkspace: some View {
+        scheduleColumn
+            .frame(maxWidth: .infinity)
+    }
+
+    private var scheduleColumn: some View {
+        VStack(spacing: AGSpace.related) {
+            scheduledSection
+            breakEndDropZone
+        }
+    }
+
+    @ViewBuilder
     private var scheduledSection: some View {
         if isLoading {
             ProgressView()
@@ -441,7 +491,9 @@ public struct ManagementSurface: View {
         _ item: ManagementScheduledItem,
         index: Int
     ) -> some View {
-        let bubble = GlassSurface {
+        let bubble = GlassSurface(
+            cornerRadius: AGLayout.managementCapsuleHeight / 2
+        ) {
             VStack(spacing: AGSpace.component) {
                 scheduledSummary(item)
                     .onTapGesture(count: 2) {
@@ -454,6 +506,9 @@ public struct ManagementSurface: View {
                 }
             }
             .padding(AGSpace.component)
+            .frame(
+                minHeight: editDraft?.id == item.id
+                    ? nil : AGLayout.managementCapsuleHeight)
         }
         .background {
             if item.isMandatory {
@@ -465,12 +520,14 @@ public struct ManagementSurface: View {
         }
         .opacity(draggedTodoId == item.id ? 0.12 : 1)
         .scaleEffect(
-            dropTarget?.actualIndex == index
-                && draggedTodoId != item.id
+            (dropTarget?.actualIndex == index
+                && draggedTodoId != item.id)
+                || breakDropTargetId == item.id
                 ? AGMotion.spatialTargetScale : 1)
         .overlay {
-            if dropTarget?.actualIndex == index,
-               draggedTodoId != item.id {
+            if (dropTarget?.actualIndex == index
+                    && draggedTodoId != item.id)
+                || breakDropTargetId == item.id {
                 RoundedRectangle(
                     cornerRadius: AGLayout.componentCornerRadius,
                     style: .continuous)
@@ -481,7 +538,8 @@ public struct ManagementSurface: View {
         }
         .animation(
             reduceMotion ? nil : AGMotion.spatialFollow,
-            value: dropTarget?.actualIndex)
+            value: breakDropTargetId ?? scheduledItems[
+                safe: dropTarget?.actualIndex ?? -1]?.id)
         .onGeometryChange(for: CGRect.self) { proxy in
             proxy.frame(in: .named(
                 "attention-guardian-schedule-management"))
@@ -538,6 +596,84 @@ public struct ManagementSurface: View {
         } else {
             bubble.accessibilityHint("不可移动事件不能拖拽")
         }
+    }
+
+    private var breakTemplateSurface: some View {
+        BreakTimeEntity(
+            state: $breakEntityState,
+            isDragging: breakEntityState.dragPhase != .idle,
+            spatialGesture: breakSpatialDragGesture)
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .named(
+                    "attention-guardian-schedule-management"))
+            } action: { frame in
+                guard breakEntityState.dragPhase == .idle else { return }
+                breakOriginFrame = frame
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var bottomBreakEntityLayer: some View {
+        VStack {
+            Spacer(minLength: 0)
+            breakTemplateSurface
+        }
+        .padding(.horizontal, horizontalInset)
+        .padding(.bottom, AGSpace.section)
+        .allowsHitTesting(true)
+        .zIndex(30)
+    }
+
+    private var breakEndDropZone: some View {
+        Button {
+            Task { await insertBreak(before: nil) }
+        } label: {
+            HStack {
+                Image(systemName: "plus")
+                Text(isInsertingBreak ? "正在加入休息" : "将休息加入队尾")
+            }
+            .font(.subheadline.weight(.medium))
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: AGLayout.minimumTouchTarget)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(GlassCapsuleButtonStyle(
+            height: AGLayout.managementCapsuleHeight))
+        .disabled(isInsertingBreak)
+        .scaleEffect(
+            breakDropTargetId == breakEndDropId
+                ? AGMotion.spatialTargetScale : 1)
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(
+                "attention-guardian-schedule-management"))
+        } action: { frame in
+            breakEndFrame = frame
+        }
+    }
+
+    @discardableResult
+    private func insertBreak(before todoId: UUID?) async -> Bool {
+        let draft = ManagementBreakTemplateDraft(
+            durationMinutes: breakEntityState.durationMinutes)
+        guard draft.isValid, !isInsertingBreak else { return false }
+        isInsertingBreak = true
+        defer {
+            isInsertingBreak = false
+            breakDropTargetId = nil
+        }
+        do {
+            try await onInsertBreak(draft, todoId)
+            return true
+        } catch {
+            errorMessage = "休息没有加入，本地事项没有改变。"
+            return false
+        }
+    }
+
+    private var breakEndDropId: UUID {
+        UUID(uuidString:
+            "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")!
     }
 
     private func scheduledSummary(
@@ -775,6 +911,54 @@ public struct ManagementSurface: View {
         }
     }
 
+    @ViewBuilder
+    private var breakSpatialDragOverlay: some View {
+        if let origin = breakOriginFrame,
+           breakEntityState.dragPhase != .idle {
+            let base = breakLandingFrame ?? origin
+            let anchor = breakPressLocation ?? CGPoint(
+                x: origin.midX,
+                y: origin.midY)
+            let diameter = min(
+                AGMotion.spatialBubbleDiameter,
+                min(origin.width, origin.height))
+            let width = base.width
+                + (diameter - base.width) * breakDragMorphProgress
+            let height = base.height
+                + (diameter - base.height) * breakDragMorphProgress
+            let sourceX = origin.minX
+                + (origin.width - width) / 2
+                + (anchor.x - origin.midX) * breakDragMorphProgress
+                + breakDragTranslation.width
+            let sourceY = origin.minY
+                + (origin.height - height) / 2
+                + (anchor.y - origin.midY) * breakDragMorphProgress
+                + breakDragTranslation.height
+            let x = breakLandingFrame.map {
+                $0.minX + ($0.width - width) / 2
+            } ?? sourceX
+            let y = breakLandingFrame.map {
+                $0.minY + ($0.height - height) / 2
+            } ?? sourceY
+
+            LensCoreBubble(
+                width: width,
+                height: height,
+                morphProgress: breakDragMorphProgress,
+                isMagnetized: breakDropTargetId != nil)
+                .frame(width: width, height: height)
+                .transformEffect(CGAffineTransform(
+                    translationX: x,
+                    y: y))
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading)
+                .allowsHitTesting(false)
+                .zIndex(11)
+        }
+    }
+
 #if os(macOS)
     private func macOSSpatialDragGesture(
         _ item: ManagementScheduledItem,
@@ -799,6 +983,26 @@ public struct ManagementSurface: View {
             .onEnded { drag in
                 finishSpatialDrag(
                     item,
+                    finalTranslation: drag.translation,
+                    pressLocation: drag.startLocation)
+            }
+    }
+
+    private var breakSpatialDragGesture: some Gesture {
+        DragGesture(
+            minimumDistance: AGMotion.spatialPointerDragDistance,
+            coordinateSpace: .named(scheduleCoordinateSpace))
+            .onChanged { drag in
+                if breakEntityState.canBeginDrag {
+                    beginBreakSpatialDrag(
+                        pressLocation: drag.startLocation)
+                }
+                updateBreakSpatialDrag(
+                    translation: drag.translation,
+                    pressLocation: drag.startLocation)
+            }
+            .onEnded { drag in
+                finishBreakSpatialDrag(
                     finalTranslation: drag.translation,
                     pressLocation: drag.startLocation)
             }
@@ -840,7 +1044,192 @@ public struct ManagementSurface: View {
                 }
             }
     }
+
+    private var breakSpatialDragGesture: some Gesture {
+        LongPressGesture(
+            minimumDuration: 0.12,
+            maximumDistance: 10)
+            .sequenced(before: DragGesture(
+                minimumDistance: 0,
+                coordinateSpace: .named(scheduleCoordinateSpace)))
+            .onChanged { value in
+                switch value {
+                case .first(true):
+                    if breakEntityState.canBeginDrag {
+                        beginBreakSpatialDrag()
+                    }
+                case let .second(true, drag?):
+                    updateBreakSpatialDrag(
+                        translation: drag.translation,
+                        pressLocation: drag.startLocation)
+                default:
+                    break
+                }
+            }
+            .onEnded { value in
+                switch value {
+                case let .second(true, drag?):
+                    finishBreakSpatialDrag(
+                        finalTranslation: drag.translation,
+                        pressLocation: drag.startLocation)
+                default:
+                    returnBreakSpatialDrag()
+                }
+            }
+    }
 #endif
+
+    private func beginBreakSpatialDrag(
+        pressLocation: CGPoint? = nil
+    ) {
+        guard editDraft == nil,
+              draggedTodoId == nil,
+              !isInsertingBreak,
+              let origin = breakOriginFrame else {
+            return
+        }
+        breakEntityState.beginDrag()
+        breakPressLocation = pressLocation ?? CGPoint(
+            x: origin.midX,
+            y: origin.midY)
+        breakLandingFrame = nil
+        breakDragTranslation = .zero
+        breakDropTargetId = nil
+        breakDragMorphProgress = 0
+        withAnimation(reduceMotion ? nil : AGMotion.spatialLift) {
+            breakDragMorphProgress = 1
+        }
+    }
+
+    private func updateBreakSpatialDrag(
+        translation: CGSize,
+        pressLocation: CGPoint
+    ) {
+        guard breakEntityState.dragPhase != .idle else {
+            return
+        }
+        breakPressLocation = pressLocation
+        withAnimation(reduceMotion ? nil : AGMotion.spatialFollow) {
+            breakDragTranslation = translation
+        }
+        let pointer = CGPoint(
+            x: pressLocation.x + translation.width,
+            y: pressLocation.y + translation.height)
+        let target = nearestBreakTarget(to: pointer)
+        if target != breakDropTargetId {
+            breakDropTargetId = target
+            if let target,
+               let index = breakTargetIndex(target) {
+                breakEntityState.magnetize(targetIndex: index)
+            } else {
+                breakEntityState.clearMagnetization()
+            }
+        }
+    }
+
+    private func finishBreakSpatialDrag(
+        finalTranslation: CGSize,
+        pressLocation: CGPoint
+    ) {
+        guard breakEntityState.dragPhase != .idle else { return }
+        let pointer = CGPoint(
+            x: pressLocation.x + finalTranslation.width,
+            y: pressLocation.y + finalTranslation.height)
+        guard let target = nearestBreakTarget(to: pointer),
+              let destination = breakTargetFrame(target) else {
+            returnBreakSpatialDrag()
+            return
+        }
+        if target != breakDropTargetId,
+           let index = breakTargetIndex(target) {
+            breakEntityState.magnetize(targetIndex: index)
+        }
+        breakDropTargetId = target
+        breakEntityState.release()
+        withAnimation(reduceMotion ? nil : AGMotion.spatialSettle) {
+            breakLandingFrame = destination
+            breakDragMorphProgress = 0
+        }
+
+        Task {
+            if !reduceMotion {
+                try? await Task.sleep(for: .milliseconds(180))
+            }
+            if await insertBreak(
+                before: target == breakEndDropId ? nil : target) {
+                breakEntityState.finishInsertion()
+                resetBreakSpatialDrag()
+            } else {
+                returnBreakSpatialDrag()
+            }
+        }
+    }
+
+    private func returnBreakSpatialDrag() {
+        guard breakEntityState.dragPhase != .idle else { return }
+        breakEntityState.cancelDrag()
+        withAnimation(reduceMotion ? nil : AGMotion.spatialSettle) {
+            breakDragTranslation = .zero
+            breakDragMorphProgress = 0
+            breakLandingFrame = breakOriginFrame
+            breakDropTargetId = nil
+        }
+        Task {
+            if !reduceMotion {
+                try? await Task.sleep(for: .milliseconds(240))
+            }
+            resetBreakSpatialDrag()
+        }
+    }
+
+    private func resetBreakSpatialDrag() {
+        if breakEntityState.dragPhase != .idle {
+            breakEntityState.cancelDrag()
+        }
+        breakPressLocation = nil
+        breakLandingFrame = nil
+        breakDragTranslation = .zero
+        breakDragMorphProgress = 0
+        breakDropTargetId = nil
+    }
+
+    private func nearestBreakTarget(to pointer: CGPoint) -> UUID? {
+        let candidates = rowFrames.compactMap { id, frame in
+            scheduledItems.contains(where: { $0.id == id })
+                ? (id, frame) : nil
+        } + (breakEndFrame.map { [(breakEndDropId, $0)] } ?? [])
+        guard let nearest = candidates.min(by: {
+            breakTargetDistance(pointer, $0.1)
+                < breakTargetDistance(pointer, $1.1)
+        }) else {
+            return nil
+        }
+        let captureDistance = max(
+            AGMotion.spatialTargetHysteresis,
+            min(nearest.1.width, nearest.1.height) * 0.8)
+        return breakTargetDistance(pointer, nearest.1) <= captureDistance
+            ? nearest.0 : nil
+    }
+
+    private func breakTargetIndex(_ target: UUID) -> Int? {
+        if target == breakEndDropId {
+            return scheduledItems.count
+        }
+        return scheduledItems.firstIndex(where: { $0.id == target })
+    }
+
+    private func breakTargetFrame(_ target: UUID) -> CGRect? {
+        target == breakEndDropId ? breakEndFrame : rowFrames[target]
+    }
+
+    private func breakTargetDistance(
+        _ point: CGPoint,
+        _ frame: CGRect
+    ) -> CGFloat {
+        let dx = max(frame.minX - point.x, 0, point.x - frame.maxX)
+        let dy = max(frame.minY - point.y, 0, point.y - frame.maxY)
+        return hypot(dx, dy)
+    }
 
     private func beginSpatialPress(
         _ item: ManagementScheduledItem,

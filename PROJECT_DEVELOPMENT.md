@@ -1491,3 +1491,100 @@ v0.1.0 GitHub 首版发布前准备。用户已确认现有产品、UI 与基础
 - 新增稳定父行身份、最终释放位置、预演等待、拖拽会话隔离和验收进程重启测试。完整 Swift
   Package 更新为 19 个 suite、66 项通过；用户使用真实鼠标连续交换同一对事件多次，确认问题
   完全修复。未修改 `HANDOFF.md`、Windows 或发布记录。
+
+## 2026-07-31：实现 Apple 管理页休息模板（等待真实鼠标拖入确认）
+
+- Presentation 新增默认 20 分钟、可调整 1–180 分钟的“休息”模板。宽屏位于队列右侧，紧凑
+  宽度移到队列上方；模板使用独立辅助底色与 Liquid Glass，拖拽预览复用 Lens Core。
+- 模板可拖到任一事件前，也可拖到或点击“将休息加入队尾”。插入不会消耗模板，可以重复操作；
+  已插入事项固定名称“休息”，按普通事件持久化，继续支持排序、时长编辑、删除和设为不可移动。
+- Application 新增按目标事件 ID 插入的编排：目标存在时使用其开始时刻，队尾使用最后事件结束
+  时刻，空队列使用当前时刻；Presentation 不执行时间计算。
+- 新增模板默认值和按目标插入后再次追加的测试。完整 Swift Package 为 19 个 suite、68 项
+  通过；禁止绝对布局 API 与差异检查通过。
+- 标准验收 App 中使用 Computer Use 点击两次“将休息加入队尾”，离开并重新进入后回读到两条
+  “休息”，确认重复插入与 SQLite 持久化。Computer Use 坐标拖动未触发系统原生拖放，真实鼠标
+  拖到指定事件前仍等待用户确认，因此本功能暂未提交。
+
+## 2026-07-31：把休息模板重构为可变形 Liquid Glass 时间实体
+
+- 用户实际拖动旧模板后发现，macOS 原生 `.draggable` 会把使用 `.thinMaterial` 的 Lens Core
+  交给脱离应用背景的系统预览层。预览无法继续采样管理页 ambient 色场，又叠加系统快照材质，
+  最终显示成突兀的不透明白球。此次删除旧模板卡片与原生拖拽预览路径，不再尝试用透明度或普通
+  阴影掩盖问题。
+- 管理页休息入口改为中心使用 `cup.and.saucer.fill` 的圆形 SwiftUI `thickMaterial` 时间实体。
+  同一个对象双击后以高阻尼 Spring 横向 Morph 为连续 Capsule Stepper，支持 1–180 分钟调整；
+  再次双击收回。材质使用系统背景采样、克制边缘高光、青绿 ambient glow 和短软阴影，未用整体
+  `opacity` 伪造通透玻璃。
+- 双击会触发一次短暂液态波纹与 specular 变化；Reduce Motion 时取消扩散和回弹，Reduce
+  Transparency 时退化为具有明确厚度的冷色实体面。圆形保持 64 point 视觉尺寸与不小于
+  44 point 的操作目标。
+- 休息拖拽现在复用普通事件的 `SpatialDragMachine` 生命周期与同一 Lens Core overlay：
+  按下点决定收拢位置，靠近事件或队尾时产生磁吸放大，释放后 Bubble 在目标处展开并调用既有
+  Application 插入用例。模板原位保留，可连续复制；队尾按钮继续作为键盘和 VoiceOver 等价入口。
+- 新增测试覆盖休息实体的展开／收回、时长保持，以及完成一次空间拖放后仍能开始下一次拖放。
+  完整 Swift Package 为 19 个 suite、70 项测试通过；`git diff --check` 与 SwiftUI 禁止绝对
+  布局扫描通过。
+- 标准验收 App 中实际把 Stepper 从 20 调为 21 分钟，并通过 Computer Use 从展开的休息实体
+  拖到 `Input Acceptance` 前。新“休息”出现在目标前，模板仍显示 21 分钟且可再次使用，证明
+  新的应用内拖拽、指定位置插入和可重复模板闭环成功；旧白色系统拖拽预览不再出现。
+
+## 2026-07-31：休息实体改为底部中央最高层并修正 Morph 时序
+
+- 根据手机端空间约束，休息实体从管理页宽屏右栏移到整个界面安全区域内的底部正中。它作为独立
+  最高交互层固定悬浮，不随事件列表滚动；滚动内容底部增加与控件高度和安全间距对应的余量，
+  使最后一项仍能滚出遮挡区。macOS 与未来 iPhone 不再维护两种模板位置。
+- 旧展开状态只有一个布尔值，圆形一开始变宽时 Stepper 子内容就同时加入视图，导致几何 Morph
+  尚未完成便出现文字和按钮。现在使用
+  `collapsed → morphingOpen → expanded → hidingContent → collapsed` 的显式阶段：
+  展开先完成 230ms 高阻尼 Spring，再用 140ms 渐显内容；收起先用 110ms 渐隐内容，再收拢形状。
+- 回归测试先在旧状态模型上因缺少阶段 API 失败，再验证 Morph 阶段 `showsStepper == false`、
+  完成后才为 true，以及收起阶段保持展开宽度但内容已经隐藏。
+- 标准验收 App 已确认圆形与展开 Stepper 均位于窗口底部正中，列表保持全宽，不再出现右侧模板
+  区域；辅助功能树确认 Stepper 内容只在完整展开态出现。
+
+## 2026-07-31：休息实体与 Lens Core 改用系统 Clear Liquid Glass
+
+- 用户指出 `.thickMaterial` 在当前深蓝 ambient 背景上形成明显乳白遮挡，而 Lens Core 的
+  `.thinMaterial` 再叠加深色径向染色只是在取样后改色，无法达到参考图的清澈透镜与内容折射。
+- 本机 Xcode 26.5 SDK 明确提供 macOS/iOS 26 的
+  `glassEffect(.clear.interactive(), in:)`。新增共享 `LiquidGlassSurface`：26 及以上直接使用
+  系统 Clear Liquid Glass，由系统完成下方内容取样、边缘折射和交互光影；旧系统降级为
+  `.ultraThinMaterial`；Reduce Transparency 仍使用清晰冷色实体面。实现未通过整体 `opacity`
+  调节材质透明度。
+- 底部休息实体与拖拽 Lens Core 统一复用该表面。Lens Core 删除深钴径向覆色，降低外阴影，
+  仅保留细薄方向性 specular 与极浅雾色，使其经过文字和卡片时能显露系统玻璃的真实折射。
+- 展开内容时序进一步明确：`collapsed` 只显示茶杯；进入 `morphingOpen` 茶杯渐隐且 Stepper
+  尚不存在；`expanded` 才渐显 Stepper。收起时 Stepper 先快速消失，形状收拢到
+  `collapsed` 后茶杯才渐显。测试增加 `showsCup` 与 `showsStepper` 的逐阶段互斥断言。
+- 标准验收 App 已确认静止圆球与展开 Capsule 明显读取下方卡片和文字，边缘产生系统 Clear
+  Glass 的折射高光；展开态辅助功能树不再包含茶杯，只包含减号、分钟数与加号。随后从收起
+  圆球再次拖到 `Input Acceptance`，新增“休息”成功出现在目标前，确认共享 Clear Glass 没有
+  破坏 Lens Core 手势、指定位置插入或模板复用。
+
+## 2026-07-31：修复休息 Stepper 点击并统一管理 Capsule 尺寸
+
+- 真实点击发现加号偶尔生效、减号完全无效。根因是整个休息实体使用
+  `.highPriorityGesture` 挂载拖拽，父级手势先于 Stepper 的两个 Button 接收事件，导致点击
+  仲裁不稳定。拖拽改为 `.simultaneousGesture`：未超过 6 point 阈值时 Button 正常完成点击，
+  超过阈值后空间拖拽状态机仍能接管。
+- 时长加减从 View 私有计算下沉到可测试的 `BreakTimeEntityState.adjustDuration(by:)`，统一
+  约束 1–180 分钟。回归测试验证 `20 → 21 → 20` 对称变化及两端边界。
+- `AGLayout` 新增 64 point `managementCapsuleHeight`。折叠事件、休息事件、队尾入口和底部
+  Stepper 统一使用 64 point 高度；静止事件表面圆角统一为高度一半的 32 point，形成真正连续
+  Capsule。双击编辑态仍允许随内容增高。
+- 标准验收 App 在窄窗口中连续点击减号两次得到 `20 → 19 → 18`，再连续点击加号两次恢复
+  `18 → 19 → 20`。截图确认整列静止气泡、队尾入口和底部 Stepper 高度与圆角一致。
+
+## 2026-07-31：更正休息 Stepper 的鼠标验收并隔离拖拽命中层
+
+- 上一轮通过辅助功能元素触发 Button 动作，只证明了加减状态逻辑正确，不能证明真实鼠标按下
+  能穿过外层手势到达 Button；用户复测后减号仍无效。此次先使用屏幕坐标真实点击稳定复现：
+  辅助功能树能识别减号，但时长保持不变，确认故障仍位于 SwiftUI 命中测试与手势仲裁层。
+- 根因是 DragGesture 仍挂在包含两个 Button 的整个休息实体祖先上；即使改成
+  `simultaneousGesture`，按钮仍需与祖先拖拽共同仲裁同一次鼠标序列。现在把空间拖拽手势只挂在
+  ZStack 最底层的 Liquid Glass 表面，Stepper 的减号和加号位于其上方并拥有独立命中层；茶杯
+  和分钟文字不截获输入，空白玻璃表面仍可开始拖拽。
+- 重新构建标准验收 App 后，以真实屏幕坐标点击验证 `20 → 19 → 20`；随后从 Stepper 中央玻璃
+  表面拖入队列，新增“休息”成功出现，证明按钮点击与空间拖放两条输入路径可以同时工作。
+- `swift test --package-path apple/AttentionGuardianDomain` 通过 19 个测试套件、71 个测试。

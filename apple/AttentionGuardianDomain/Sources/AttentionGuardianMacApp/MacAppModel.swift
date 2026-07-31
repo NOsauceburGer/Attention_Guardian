@@ -232,6 +232,22 @@ final class MacAppModel: ObservableObject {
             usedFallbackPosition: result.usedFallbackPosition)
     }
 
+    func insertManagedBreak(
+        _ draft: ManagementBreakTemplateDraft,
+        beforeTodoId: UUID?
+    ) async throws {
+        guard let persistence else { throw MacAppError.persistenceUnavailable }
+        let result = try await ScheduleManagementUseCase(
+            repository: persistence.scheduledTodos,
+            clock: SystemClock())
+            .insertBreak(
+                id: UUID(),
+                beforeTodoId: beforeTodoId,
+                duration: draft.duration)
+        setManagedSchedule(result.scheduledTodos)
+        try await refreshOpeningState()
+    }
+
     func deleteManagedFutureTodo(_ id: UUID) async throws {
         guard let persistence else { throw MacAppError.persistenceUnavailable }
         let records = try await FutureTodoManagementUseCase(
